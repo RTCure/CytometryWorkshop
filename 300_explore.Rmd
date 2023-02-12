@@ -1,0 +1,127 @@
+---
+title: "Cytometry Workflow 3 - Visualizations"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(targets)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM","Rtsne",
+                              "yaml","tidyverse")))
+```
+
+# Radviz
+
+To visualize single cell data associated with this experiment we use Radviz projections ([Abraham 2016](https://doi.org/10.1002/cyto.b.21499)). First we prepare a scaled dataset for projection:
+
+```{targets live.scaled, tar_simple=TRUE}
+live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do.L(.x,
+                         fun=function(x) quantile(x,
+                                                  c(0,0.975))))) %>% 
+    select(all_of(c("name",
+                    with(markers,
+                         name[type %in% c("phenotypic",
+                                          "functional")])))) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !name)
+```
+
+Next we Compute a similarity matrix and optimize channel orders for phenotypic and functional channels independently:
+
+```{targets radviz-optim}
+list(
+    tar_target(live.sim,{
+        live.scaled %>% 
+            select(!name) %>% 
+            as.matrix(.) %>% 
+            cosine(.)
+    }),
+    tar_target(pheno.S,{
+        .pheno.S <- make.S(with(markers,
+                                desc[type=="phenotypic"]))
+        .pheno.optim <- lapply(seq(1,10),function(i) {
+            cat('Run #',i,'\n')
+            .optim.cur.cells <- do.optimRadviz(.pheno.S,live.sim,top=75)
+            return(list(best=in.da(make.S(get.optim(.optim.cur.cells)),live.sim),
+                        springs=get.optim(.optim.cur.cells)))
+        })
+        .pheno.optim.best <- lapply(.pheno.optim,function(x) x$best)
+        make.S(.pheno.optim[[which.max(.pheno.optim.best)]]$springs)
+    }),
+    tar_target(func.S,{
+        .func.S <- make.S(with(markers,
+                               desc[type=="functional"]))
+        .func.optim <- lapply(seq(1,10),function(i) {
+            cat('Run #',i,'\n')
+            .optim.cur.cells <- do.optimRadviz(.func.S,live.sim,top=75)
+            return(list(best=in.da(make.S(get.optim(.optim.cur.cells)),live.sim),
+                        springs=get.optim(.optim.cur.cells)))
+        })
+        .func.optim.best <- lapply(.func.optim,function(x) x$best)
+        make.S(.func.optim[[which.max(.func.optim.best)]]$springs)
+    })
+)
+```
+
+Finally we create the `Radviz` objects corresponding to each type of channels:
+
+```{targets radviz-proj}
+list(
+    tar_target(pheno.rv,{
+        live.scaled %>% 
+            left_join(annots,
+                      by = "name") %>% 
+            do.radviz(.,
+                      pheno.S)
+    }),
+    tar_target(func.rv,{
+        live.scaled %>% 
+            left_join(annots,
+                      by = "name") %>% 
+            do.radviz(.,func.S)
+    })
+)
+```
+
+# Render the `_explore` report
+
+At this stage we define an `_explore` report that will become part of the pipeline and will be automatically updated as required, to visualize the results of the QC and the `Radviz` projections:
+
+```{targets explore-report}
+tarchetypes::tar_render(explore,
+                        "reports/_explore.Rmd",
+                        params = list(store = tar_config_get("store")))
+```
+
+# Run the pipeline
+
+```{r}
+tar_make()
+```
