@@ -1,0 +1,214 @@
+---
+title: "Cytometry Workflow 5 - Differential Analysis"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(targets)
+library(tarchetypes)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM",
+                              "yaml","tidyverse")))
+```
+
+# Differential analysis
+
+We run differential analysis using a **G**eneralized **L**inear **M**ixed **M**odel framework with a negative binomial distribution to identify groups of cells that are significantly enriched or depleted in the experiment.
+
+First we define the model and contrasts we are interested in:
+
+```{targets params-analysis}
+list(
+    tar_target(model.total,
+               Count ~ Stimulation + (1|Individual) + offset(logTotal)),
+    tar_target(live.contrasts,{
+        list("Stim-Rest" = c(-1,1))
+    }),
+    tar_target(model.total.specs, {
+        .specs <- labels(terms(model.total))
+        .specs <- .specs[-c(grep("\\|", .specs), grep("\\:", .specs))]
+        as.formula(paste("~",
+                         paste(.specs,
+                               collapse = "+")))
+    })
+)
+```
+
+The `offset` term in the model define which reference the population will be compared to.
+
+## Population (manual gates)
+
+Let's start by extracting population sizes:
+
+```{targets pops.df, tar_simple=TRUE}
+.gs <- load_gs(params_path)
+recompute(.gs) # just in case
+.counts <- gs_pop_get_count_fast(.gs)
+.total <- .counts %>% 
+    filter(Population==params_population) %>% 
+    select(name,Total = Count)
+annots %>%
+    left_join(.counts,
+              by = "name") %>%
+    left_join(.total,
+              by = "name") %>%
+    filter(str_detect(Population,fixed(paste0(params_population,"/")))) %>% 
+    mutate(logTotal = log(Total),
+           logParent = log(ParentCount))
+```
+
+We keep both the Parent size and the Total size so that analysis can be run relative to Parent population or over all cells per file. In the next step we fit the models for each population:
+
+```{targets live.pop.models, tar_simple=TRUE}
+pops.df %>% 
+    nest(data = -Population) %>% 
+    mutate(model = map(data,
+                       ~ glmer.nb(model.total,
+                                  data=.,
+                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
+           estimate = map2(model,
+                           data,
+                           ~ emmeans(.x,
+                                     specs = model.total.specs,
+                                     data = .y)),
+           `N cells` = map_dbl(data,~sum(.$Count)),
+           `Percent cells` = 100*`N cells`/sum(`N cells`))
+```
+
+Next we extract the contrasts:
+
+```{targets live.pop.contrasts, tar_simple=TRUE}
+live.pop.models %>% 
+    mutate(contrast = map(estimate,~ contrast(.,
+                                              live.contrasts,
+                                              adjust = "tukey"))) %>% 
+    select(Population, contrast, 
+           `Percent cells`, `N cells`) %>% 
+    mutate(contrast = map(contrast,~ as_tibble(.))) %>% 
+    unnest(contrast) %>% 
+    mutate(contrast = factor(contrast,
+                             levels = names(live.contrasts)),
+           p.adjustFDR = p.adjust(p.value,
+                                  method = "fdr"),
+           log.p.value = -log10(p.adjustFDR))
+```
+
+Finally we prepare a basic volcano plot to visualize the results:
+
+```{targets live.pop.volcano, tar_simple=TRUE}
+live.pop.contrasts %>% 
+    mutate(PopName = str_replace(Population,
+                                 fixed(params_population),
+                                 "")) %>% 
+    ggplot(aes(x = estimate,
+               y = log.p.value))+
+    geom_label(aes(label = PopName))+
+    geom_vline(xintercept = c(-1,1),
+               col = 2, lty = 2)+
+    geom_hline(yintercept = -log10(0.05),
+               col = 2, lty = 2)
+```
+
+## Metaclusters
+
+Let's start by extracting population sizes:
+
+```{targets metas.df, tar_simple=TRUE}
+live.df %>% 
+    mutate(Population = factor(live.fsom.metaclusters)) %>% 
+    count(name, Population,
+          name = "Count") %>% 
+    group_by(name) %>% 
+    mutate(Total = sum(Count),
+           logTotal = log(Total)) %>% 
+    ungroup() %>% 
+    left_join(annots,
+              by = "name")
+```
+
+Only the Total size makes sense here, since metaclusters are not nested. In the next step we fit the models for each population:
+
+```{targets live.meta.models, tar_simple=TRUE}
+metas.df %>% 
+    nest(data = -Population) %>% 
+    mutate(model = map(data,
+                       ~ glmer.nb(model.total,
+                                  data=.,
+                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
+           estimate = map2(model,
+                           data,
+                           ~ emmeans(.x,
+                                     specs = model.total.specs,
+                                     data = .y)),
+           `N cells` = map_dbl(data,~sum(.$Count)),
+           `Percent cells` = 100*`N cells`/sum(`N cells`))
+```
+
+Next we extract the contrasts:
+
+```{targets live.meta.contrasts, tar_simple=TRUE}
+live.meta.models %>% 
+    mutate(contrast = map(estimate,~ contrast(.,
+                                              live.contrasts,
+                                              adjust = "tukey"))) %>% 
+    select(Population, contrast, 
+           `Percent cells`, `N cells`) %>% 
+    mutate(contrast = map(contrast,~ as_tibble(.))) %>% 
+    unnest(contrast) %>% 
+    mutate(contrast = factor(contrast,
+                             levels = names(live.contrasts)),
+           p.adjustFDR = p.adjust(p.value,
+                                  method = "fdr"),
+           log.p.value = -log10(p.adjustFDR))
+```
+
+Finally we prepare a basic volcano plot to visualize the results:
+
+```{targets live.meta.volcano, tar_simple=TRUE}
+live.meta.contrasts %>% 
+    ggplot(aes(x = estimate,
+               y = log.p.value))+
+    geom_label(aes(label = Population))+
+    geom_vline(xintercept = c(-1,1),
+               col = 2, lty = 2)+
+    geom_hline(yintercept = -log10(0.05),
+               col = 2, lty = 2)
+```
+
+# Render the `_analysis` report
+
+We will visualize the results and run more exploration in the `_analysis` report:
+
+```{targets analysis-report}
+tarchetypes::tar_render(analysis,
+                        "reports/_analysis.Rmd",
+                        params = list(store = tar_config_get("store")))
+```
+
+# Run the pipeline
+
+```{r}
+tar_make()
+```

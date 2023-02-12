@@ -1,0 +1,161 @@
+---
+title: "Visualizing Differential Analysis Results"
+params:
+  store: "..\\_targets"
+output:
+  html_notebook:
+    df_print: paged
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+# loading the packages
+
+```{r setup}
+library(targets)
+
+library(knitr)
+
+library(tidyverse)
+
+library(Radviz)
+
+theme_set(theme_light(base_size = 16))
+tar_config_set(store = params$store)
+```
+
+# loading the data
+
+```{r data}
+tar_load(params_population)
+tar_load(markers)
+tar_load(annots)
+tar_load(pops.df)
+tar_load(live.pop.contrasts)
+tar_load(live.pop.volcano)
+tar_load(metas.df)
+tar_load(live.meta.contrasts)
+tar_load(live.meta.volcano)
+```
+
+# Visualizing the results
+
+## Population
+
+### Volcano plot
+
+```{r}
+live.pop.volcano
+```
+
+```{r}
+live.pop.contrasts %>% 
+    filter(abs(estimate)>1,
+           p.adjustFDR<0.05) %>% 
+    mutate(PopName = str_replace(Population,
+                                 fixed(params_population),
+                                 "")) %>% 
+    select(Population = PopName,
+           contrast,
+           estimate,
+           p.adjustFDR) %>% 
+    arrange(Population, contrast)
+```
+
+### Details {.tabset}
+
+```{r, results='asis'}
+cur.pops <- live.pop.contrasts %>% 
+    filter(abs(estimate)>1,
+           p.adjustFDR<0.05) %>% 
+    distinct(Population,)
+cur.pops <- cur.pops$Population
+
+ksink <- lapply(cur.pops,function(cur.pop) {
+    cat("#### ",str_replace(cur.pop,
+                            fixed(params_population),
+                            ""),"\n\n")
+    cur.table <- live.pop.contrasts %>% 
+        filter(Population==cur.pop) %>% 
+        mutate(PopName = str_replace(Population,
+                                     fixed(params_population),
+                                     "")) %>% 
+        select(Population = PopName,
+               contrast,
+               estimate,
+               p.adjustFDR) %>% 
+        arrange(Population, contrast)
+    print(kable(cur.table))
+    cat("\n\n")
+    cur.plot <- pops.df %>% 
+        filter(Population==cur.pop) %>% 
+        mutate(PopName = str_replace(Population,
+                                     fixed(params_population),
+                                     ""),
+               `Percent cells` = Count/Total,
+               i = dense_rank(`Percent cells`)) %>% 
+        ggplot(aes(x = i,
+                   y = `Percent cells`))+
+        geom_point()+
+        scale_y_continuous(labels = scales::percent_format())+
+        facet_grid(cols=vars(PopName))
+    print(cur.plot)
+    cat("\n\n")
+})
+```
+
+## Metacluster
+
+### Volcano plot
+
+```{r}
+live.meta.volcano
+```
+
+```{r}
+live.meta.contrasts %>% 
+    filter(abs(estimate)>1,
+           p.adjustFDR<0.05) %>% 
+    select(Population,
+           contrast,
+           estimate,
+           p.adjustFDR) %>% 
+    arrange(Population, contrast)
+```
+
+### Details {.tabset}
+
+```{r, results='asis'}
+cur.pops <- live.meta.contrasts %>% 
+    filter(abs(estimate)>1,
+           p.adjustFDR<0.05) %>% 
+    distinct(Population,)
+cur.pops <- cur.pops$Population
+
+ksink <- lapply(cur.pops,function(cur.pop) {
+    cat("#### ",cur.pop,"\n\n")
+    cur.table <- live.meta.contrasts %>% 
+        filter(Population==cur.pop) %>% 
+        select(Population,
+               contrast,
+               estimate,
+               p.adjustFDR) %>% 
+        arrange(Population, contrast)
+    print(kable(cur.table))
+    cat("\n\n")
+    cur.plot <- metas.df %>% 
+        filter(Population==cur.pop) %>% 
+        mutate(`Percent cells` = Count/Total,
+               i = dense_rank(`Percent cells`)) %>% 
+        ggplot(aes(x = i,
+                   y = `Percent cells`))+
+        geom_point()+
+        scale_y_continuous(labels = scales::percent_format())+
+        facet_grid(cols=vars(Population))
+    print(cur.plot)
+    cat("\n\n")
+})
+```
+
