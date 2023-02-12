@@ -1,0 +1,145 @@
+---
+title: "Cytometry Workflow 1 - Preparing the data"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(targets)
+# tar_unscript() # this line resets the whole pipeline!
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM","Rtsne",
+                              "yaml","tidyverse")))
+```
+
+# Parameters
+
+We need to define:
+
+ - the path to the `GatingSet` object to analyze
+ - the full node path to the root population of interest
+ - the list of markers corresponding to the different categories
+     - *reference* markers that are part of the gating scheme and will be negative or positive for all cells
+     - *phenotypic* markers that are differentiating populations within the population of interest (bimodal)
+     - *functional* markers that are indicative of the status of the cells (continuous)\
+     - all other markers are considered *CyTOF*
+
+```{targets params}
+list(tar_target(params_path,
+                "process\\workshop\\live"),
+     tar_target(params_population,
+                "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"),
+     tar_target(params_ref_markers,
+                "(cells|dead|CD45|CD3)"),
+     tar_target(params_pheno_markers,
+                "CD127|CD4|CD8|TBET|CD25|gdTCR|CD45RA|CD27|FOXP3|CD56"),
+     tar_target(params_func_markers,
+                "CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR3|CD161|IL-10|CCR7|IL21|CTLA4|CXCR5|IL17F|HLA-DR|IFNg|TNF")
+)
+```
+
+# Sample annotation
+
+Sample annotation can be either parsed from FCS file names (as below) or loaded from a file; is **must** include at least a `name` column corresponding to the FCS file names as returned by `sampleNames(.gs)` below.
+
+```{targets annots, tar_simple=TRUE}
+.gs <- load_gs(params_path)
+tibble(name = sampleNames(.gs)) %>% 
+    mutate(Experiment = str_extract(name,"[0-9]{6}"),
+           Experiment = factor(Experiment),
+           Stimulation = str_extract(name,"(rest)|(stim)"),
+           Stimulation = factor(Stimulation,
+                                levels = c("rest","stim")),
+           Individual = str_extract(name,"SK[0-9]{3}"),
+           Individual = factor(Individual))
+```
+
+# Marker annotation
+
+Marker annotation uses the parameters identified above to identify channels that are important for the analysis; in particular *phenotypic* and *functional* markers will be used throughout. This is also an opportunity to clean up the `desc` field, returning human-readable channel names.
+
+It's easier to get started from the file associated with the `GatingSet` being analyzed as shown below:
+
+```{targets markers, tar_simple=TRUE}
+.gs <- load_gs(params_path)
+as_tibble(pData(parameters(gs_cyto_data(.gs)[[1]])),
+                      rownames = "id") %>% 
+    mutate(desc_orig = desc) %>% 
+    separate(desc,
+             c("isotope","desc"),
+             sep = "_") %>% 
+    mutate(type = case_when(
+        str_detect(desc,params_ref_markers) ~ "reference",
+        str_detect(desc,params_pheno_markers) ~ "phenotypic",
+        str_detect(desc,params_func_markers) ~ "functional",
+        TRUE ~ "CyTOF"),
+    desc = if_else(is.na(desc),
+                   name,
+                   desc),
+    desc = make.names(desc),
+    type = factor(type,
+                  levels = c("reference","phenotypic","functional","CyTOF")))
+```
+
+# Extract the data
+
+To run the analysis we will need to access the expression values stored in the FCS files through the `exprs` command:
+
+```{targets gs-to-tibble}
+list(
+    tar_target(live.mats,{
+        .gs <- load_gs(params_path)
+        lapply(.gs,
+               function(gh) {
+                   exprs(gh_pop_get_data(gh,
+                                         params_population))})
+    }),
+    tar_target(live.df,{
+        bind_rows(lapply(live.mats,
+                         as_tibble),
+                  .id = "name")
+    })
+)
+```
+
+# Run the pipeline
+
+```{r}
+tar_make()
+```
+
+# Quick overview
+
+## Sample annotations
+
+```{r}
+tar_read(annots)
+```
+
+## Marker annotations
+
+```{r}
+tar_read(markers)
+```
+
