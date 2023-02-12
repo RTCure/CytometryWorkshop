@@ -1,0 +1,246 @@
+---
+title: "Visualizing Workflow Output"
+params:
+  store: "..\\_targets"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '4'
+    df_print: paged
+  html_notebook:
+    df_print: paged
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+# loading the packages
+
+```{r setup}
+library(targets)
+
+library(knitr)
+
+library(tidyverse)
+
+library(Radviz)
+library(cytofan)
+
+theme_set(theme_light(base_size = 16))
+tar_config_set(store = params$store)
+```
+
+# loading the data
+
+```{r data}
+tar_load(markers)
+tar_load(annots)
+tar_load(live.df)
+tar_load(pheno.rv)
+tar_load(func.rv)
+tar_load(live.fsom.clusters)
+tar_load(live.fsom.metaclusters)
+tar_load(metas.df)
+```
+
+# Metacluster profiles {.tabset}
+
+Let's visualize metaclusters as heatmaps:
+
+## Median intensity
+
+```{r, fig.width = 8}
+live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    select(Population,with(markers,name[type=="phenotypic"])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    group_by(Population,Channel) %>% 
+    summarize(value = median(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = value))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
+## Median intensity (normalized per channel)
+
+```{r, fig.width = 8}
+live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    select(Population,with(markers,name[type=="phenotypic"])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    group_by(Population,Channel) %>%
+    summarize(value = median(value)) %>% 
+    group_by(Channel) %>% 
+    mutate(value = do.L(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = value))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
+## Median intensity (normalized per population)
+
+```{r, fig.width = 8}
+live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    select(Population,with(markers,name[type=="phenotypic"])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    group_by(Population,Channel) %>%
+    summarize(value = median(value)) %>% 
+    group_by(Population) %>% 
+    mutate(value = do.L(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = value))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
+# Metaclusters of interest #1
+
+*To visualize or compare different subsets, simply copy the whole section and edit the next block.*
+
+Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
+
+```{r}
+cur.metas <- c(3,5,9)
+```
+
+```{r}
+metas.df %>% 
+    filter(Population %in% cur.metas) %>%
+    group_by(Population) %>% 
+    summarize(Count = sum(Count),
+              Total = sum(Total)) %>% 
+    mutate(`Percent cells (Total)` = paste0(round(100*Count/Total,1),"%"))
+```
+
+## Radviz {.tabset}
+
+### Phenotypic
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas),
+                   aes(color = Population))
+```
+
+### Functional
+
+```{r}
+plot(func.rv)+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas),
+                   aes(color = Population))
+```
+
+## Fan plots {.tabset}
+
+Fan plots ([Britton 1998](https://www.bankofengland.co.uk/quarterly-bulletin/1998/q1/the-inflation-report-projections-understanding-the-fan-chart)) have been implemented for cytometry visualization in the [cytofan](https://cran.r-project.org/package=cytofan) package.
+
+### Phenotypic
+
+```{r}
+live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    filter(Population %in% cur.metas) %>% 
+    select(Population,with(markers,name[type=="phenotypic"])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+### All channels
+
+```{r}
+live.df %>% 
+    mutate(Population = factor(live.fsom.metaclusters)) %>% 
+    filter(Population %in% cur.metas) %>% 
+    select(Population,with(markers,name[type %in% c("phenotypic",
+                                                    "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    mutate(Channel = factor(Channel,
+                            levels = c(rownames(springs(pheno.rv)),
+                                       rownames(springs(func.rv))))) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+## Drilling down into a specific metacluster {.tabset}
+
+Metaclusters are composed of clusters, so let's drill down when level deeper
+
+```{r}
+cur.meta <- 5
+```
+
+### Radviz
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>%
+                       mutate(Population = factor(live.fsom.clusters)) %>%
+                       filter(live.fsom.metaclusters==cur.meta),
+                   color = "grey30")+
+    geom_density2d(data = . %>% 
+                       mutate(Population = factor(live.fsom.clusters)) %>% 
+                       filter(live.fsom.metaclusters==cur.meta) %>% 
+                       sample_frac(0.1),
+                   aes(color = Population))
+```
+
+### Fan plot
+
+```{r}
+live.df %>% 
+    mutate(Population = factor(live.fsom.clusters)) %>% 
+    filter(live.fsom.metaclusters==cur.meta) %>% 
+    select(Population,with(markers,name[type %in% c("phenotypic",
+                                                    "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    mutate(Channel = factor(Channel,
+                            levels = c(rownames(springs(pheno.rv)),
+                                       rownames(springs(func.rv))))) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
