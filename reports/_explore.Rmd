@@ -42,7 +42,7 @@ tar_load(live.tsne.proj)
 
 ```{r}
 live.mem.plot+
-    geom_point()+
+    geom_point(aes(color = Stimulation))+
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -50,7 +50,8 @@ live.mem.plot+
 
 ```{r}
 live.hilbert.proj+
-    geom_point(aes(size = N))
+    geom_point(aes(size = N,
+                   color = Stimulation))
 ```
 
 # Radviz {.tabset}
@@ -59,12 +60,20 @@ live.hilbert.proj+
 
 ```{r}
 plot(pheno.rv)+
-    geom_density2d()
+    geom_density2d(aes(color = Stimulation))
 ```
 
 ## Functional
 
 ```{r}
 plot(func.rv)+
-    geom_density2d()
+    geom_density2d(aes(color = Stimulation))
 ```
+
+# *t*-SNE
+
+```{r}
+live.tsne.proj+
+    geom_point(aes(color = Stimulation))
+```
+

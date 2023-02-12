@@ -29,7 +29,7 @@ tar_option_set(packages = c(c("MASS","cluster",
                               "hilbertSimilarity","entropy",
                               "Radviz","cytofan",
                               "lme4","emmeans",
-                              "FlowSOM","Rtsne",
+                              "FlowSOM",
                               "yaml","tidyverse")))
 ```
 
@@ -47,15 +47,15 @@ We need to define:
 
 ```{targets params}
 list(tar_target(params_path,
-                "process\\workshop\\live"),
-     tar_target(params_population,
-                "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"),
-     tar_target(params_ref_markers,
-                "(cells|dead|CD45|CD3)"),
-     tar_target(params_pheno_markers,
-                "CD127|CD4|CD8|TBET|CD25|gdTCR|CD45RA|CD27|FOXP3|CD56"),
-     tar_target(params_func_markers,
-                "CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR3|CD161|IL-10|CCR7|IL21|CTLA4|CXCR5|IL17F|HLA-DR|IFNg|TNF")
+               "process\\workshop\\live"),
+    tar_target(params_population,
+               "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"),
+    tar_target(params_ref_markers,
+               "(cells|dead|CD45|CD3)"),
+    tar_target(params_pheno_markers,
+               "CD127|CD4|CD8|TBET|CD25|gdTCR|CD45RA|CD27|FOXP3|CD56"),
+    tar_target(params_func_markers,
+               "CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR3|CD161|IL-10|CCR7|IL21|CTLA4|CXCR5|IL17F|HLA-DR|IFNg|TNF")
 )
 ```
 

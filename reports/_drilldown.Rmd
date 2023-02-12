@@ -124,7 +124,7 @@ cur.metas <- c(3,5,9)
 
 ```{r}
 metas.df %>% 
-    filter(Population %in% cur.metas) %>%
+    filter(Population %in% cur.metas) %>% 
     group_by(Population) %>% 
     summarize(Count = sum(Count),
               Total = sum(Total)) %>% 

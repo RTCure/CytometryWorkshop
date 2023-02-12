@@ -110,6 +110,28 @@ list(
 )
 ```
 
+# *t*-SNE
+
+```{targets live.tsne.proj, tar_simple=TRUE, tar_interactive=FALSE}
+.mat <- live.df %>%
+    select(all_of(c("name",
+                    with(markers,
+                         name[type %in% c("phenotypic",
+                                          "functional")])))) %>% 
+    group_by(name) %>% 
+    sample_frac(0.1)
+.tsne <- Rtsne(.mat[,-1])
+
+bind_cols(.mat,
+          as_tibble(.tsne$Y)) %>% 
+    rename(x = `V1`,
+           y = `V2`) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    ggplot(aes(x = x,
+               y = y))
+```
+
 # Render the `_explore` report
 
 At this stage we define an `_explore` report that will become part of the pipeline and will be automatically updated as required, to visualize the results of the QC and the `Radviz` projections:
