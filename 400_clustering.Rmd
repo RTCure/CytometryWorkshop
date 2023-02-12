@@ -1,0 +1,87 @@
+---
+title: "Cytometry Workflow 4 - Clustering"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(targets)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM",
+                              "yaml","tidyverse")))
+```
+
+# FlowSOM
+
+On top of manual gating we use `FlowSOM` ([Van Gassen 2015](https://doi.org/10.1002/cyto.a.22625)). First we define the parameters:
+
+ - the size of the grid (number of clusters)
+ - the number of metaclusters to return
+ - the channels to use for clustering
+ 
+```{targets params-fsom}
+list(
+    tar_target(params_fsom_grid,7),
+    tar_target(params_fsom_nclus,10),
+    tar_target(params_fsom_channels,{
+        with(markers,
+             name[type %in% c("phenotypic")])
+    })
+)
+```
+
+Then we run the clustering algorithm:
+
+```{targets live.fsom, tar_simple=TRUE}
+.gs <- load_gs(params_path)
+
+FlowSOM(gs_pop_get_data(.gs,
+                        params_population),
+        compensate = FALSE,
+        transform = FALSE,
+        scale = FALSE,
+        xdim = params_fsom_grid, 
+        ydim = params_fsom_grid,
+        colsToUse = params_fsom_channels,
+        nClus = params_fsom_nclus)
+```
+
+Finally we extract the clusters and metaclusters to use in other analysis:
+
+```{targets fsom-clusters}
+list(
+    tar_target(live.fsom.clusters,{
+        live.fsom$map$mapping[,1]
+    }),
+    tar_target(live.fsom.metaclusters,{
+        live.fsom$metaclustering[live.fsom.clusters]
+    })
+)
+```
+
+# Run the pipeline
+
+```{r}
+tar_make()
+```
