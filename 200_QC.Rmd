@@ -1,0 +1,159 @@
+---
+title: "Cytometry Workflow 2 - Quality Control"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(targets)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM","Rtsne",
+                              "yaml","tidyverse")))
+```
+
+# Marker Enrichment Modeling (MEM)
+
+To identify potential batch effects associated to channel intensity we use the **M**arker **E**nrichment **M**odeling method ([Diggins 2017](https://doi.org/10.1038/nmeth.4149)) with some adapations:
+
+```{targets live.mem, tar_simple=TRUE, tar_interactive=FALSE}
+.mats.med <- lapply(live.mats,function(mt,ch) {
+    mm <- apply(mt[,ch],2,median)
+    return(mm)
+},with(markers,name[type %in% c("phenotypic","functional")]))
+
+.mats.iqr <- lapply(live.mats,function(mt,ch) {
+    mi <- apply(mt[,ch],2,IQR)
+    if(min(mi)==0) {
+        thresh <- min(mi[mi>0])
+        thresh <- 10^floor(log10(thresh))
+        mi <- replace(mi,mi==0,thresh)
+    }
+    return(mi)
+},with(markers,name[type %in% c("phenotypic","functional")]))
+
+.ref <- pam(bind_rows(.mats.med),1)
+.ref <- .ref$id.med
+
+.med.diffs <- sweep(bind_rows(.mats.med),2,.mats.med[[.ref]],`-`)
+.iqr.ratio <- sweep(bind_rows(.mats.iqr),2,.mats.iqr[[.ref]],`/`)
+.iqr.ratio <- 1/.iqr.ratio
+
+.mem <- abs(.med.diffs)+.iqr.ratio-1
+.mem[.med.diffs<0] <- -.mem[.med.diffs<0]
+.mem <- asinh(.mem)
+rownames(.mem) <- names(.mats.med)
+.mem <- .mem[-.ref,]
+.mem
+```
+
+We prepare a basic plot for reporting:
+
+```{targets mem-plot, tar_interactive=FALSE}
+tar_target(live.mem.plot, {
+    as_tibble(live.mem,rownames = "id") %>% 
+        gather("name","MEM",-id) %>% 
+        left_join(markers[,c("name","desc")],
+                  by = "name") %>% 
+        left_join(annots,
+                  by = c("id"="name")) %>% 
+        mutate(desc = factor(desc),
+               desc = reorder(desc,abs(MEM),mean),
+               desc = factor(desc,
+                             levels = rev(levels(desc)))) %>% 
+        ggplot(aes(x = desc,
+                   y = MEM))+
+        geom_line(aes(group = id),
+                  color = "grey80")
+})
+```
+
+# Hilbert Similarity
+
+To identify potential batch effects we compute the similarity between samples using the `hilbertSimilarity` package ([doi:10.5281/zenodo.3557362](https://zenodo.org/record/3557362)). First we define which markers to include in the analysis:
+
+```{targets params-hilbert}
+tar_target(params_hilbert_channels,{
+    with(markers,
+         name[type %in%c("phenotypic","functional")])
+})
+```
+
+Next we associate every cell in the dataset to a value on the Hilbert curve defined over all selected channels:
+
+```{targets live.hilbert, tar_simple=TRUE, tar_interactive=FALSE}
+## create the cuts 
+.nbins <- 2
+
+.cuts <- live.df %>% 
+    select(all_of(params_hilbert_channels)) %>% 
+    as.matrix() %>% 
+    make.cut(.,
+             n=.nbins+1,
+             count.lim=40)
+
+## apply the cuts
+.cutMat <- live.df %>% 
+    select(all_of(params_hilbert_channels)) %>% 
+    as.matrix() %>% 
+    do.cut(.,.cuts,
+           type='combined')
+
+## generate the hilbert index
+do.hilbert(.cutMat,.nbins)
+```
+
+Based on the Hilbert index we compute the composition of every sample and determine sample similarity using the Jensen-Shannon distance:
+
+```{targets live.hilbert.dist, tar_simple=TRUE, tar_interactive = FALSE}
+.counts <- table(live.df$name,
+                 live.hilbert)
+
+js.dist(.counts)
+```
+
+To visualize the similarity between samples we create a simple projection using the **M**ulti**D**imensional **S**caling method:
+
+```{targets live.hilbert.proj, tar_simple=TRUE, tar_interactive = FALSE}
+.proj <- isoMDS(live.hilbert.dist)
+
+as_tibble(.proj$points,
+          .name_repair = "universal",
+          rownames = "name") %>% 
+    rename(x = `...1`,
+           y = `...2`) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    left_join(live.df %>% 
+                  count(name,
+                        name = "N"),
+              by = "name") %>% 
+    ggplot(aes(x = x,
+               y = y))
+```
+
+# Run the pipeline
+
+```{r}
+tar_make()
+```
