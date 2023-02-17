@@ -18,7 +18,7 @@ input.dir <- "input"
 process.dir <- "process"
 output.dir <- "output"
 
-exp.id <- "workshop" # specify which folder contains the experiment
+exp.id <- "MADELEINE" # specify which folder contains the experiment
 
 if(!file.exists(file.path(output.dir,exp.id))) {
     dir.create(file.path(output.dir,exp.id),
