@@ -34,7 +34,7 @@ tar_option_set(packages = c(c("MASS","cluster",
 
 # Marker Enrichment Modeling (MEM)
 
-To identify potential batch effects associated to channel intensity we use the **M**arker **E**nrichment **M**odeling method ([Diggins 2017](https://doi.org/10.1038/nmeth.4149)) with some adapations:
+To identify potential batch effects associated to channel intensity we use the **M**arker **E**nrichment **M**odeling method ([Diggins 2017](https://doi.org/10.1038/nmeth.4149)) with some adaptations:
 
 ```{targets live.mem, tar_simple=TRUE, tar_interactive=FALSE}
 .mats.med <- lapply(live.mats,function(mt,ch) {
