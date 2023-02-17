@@ -20,8 +20,9 @@ output:
 ```{r setup}
 library(targets)
 
-library(knitr)
+library(flowWorkspace)
 
+library(knitr)
 library(tidyverse)
 
 library(Radviz)
@@ -34,6 +35,7 @@ tar_config_set(store = params$store)
 # loading the data
 
 ```{r data}
+# tar_make()
 tar_load(markers)
 tar_load(annots)
 tar_load(live.df)
@@ -112,6 +114,39 @@ live.df %>%
                           high = "orangered2")
 ```
 
+## Fold change upon stimulation
+
+A very basic version:
+
+```{r, fig.width = 8}
+live.df %>% 
+    select(name,with(markers,name[type=="phenotypic"])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !name) %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    select(Stimulation,Population,with(markers,desc[type=="phenotypic"])) %>% 
+    gather("Channel","value",
+           -c(Population,Stimulation)) %>% 
+    group_by(Stimulation,Population,Channel) %>%
+    summarize(value = median(value)) %>% 
+    group_by(Population,Channel) %>% 
+    summarize(fc = diff(log2(value))) %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = fc))+
+    scale_fill_gradient2(low = blues9[7],
+                          high = "orangered2")
+```
+
+Things that would need to be looked into :
+
+ - we have a lot of zeros resulting in `NA` when taking the `log2` : adding a pseudo-count would help
+ - double-check whether the color scale is symmetrical
+ - the total number of cells would need to be reflected (eg in the size of the tile)
+
 # Metaclusters of interest #1
 
 *To visualize or compare different subsets, simply copy the whole section and edit the next block.*
@@ -119,12 +154,12 @@ live.df %>%
 Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
 
 ```{r}
-cur.metas <- c(3,5,9)
+cur.metas <- c(4,5,6)
 ```
 
 ```{r}
 metas.df %>% 
-    filter(Population %in% cur.metas) %>%
+    # filter(Population %in% cur.metas) %>%
     group_by(Population) %>% 
     summarize(Count = sum(Count),
               Total = sum(Total)) %>% 
@@ -199,48 +234,66 @@ live.df %>%
     facet_grid(rows = vars(Population))
 ```
 
-## Drilling down into a specific metacluster {.tabset}
+# Populations to metaclusters
 
-Metaclusters are composed of clusters, so let's drill down when level deeper
-
-```{r}
-cur.meta <- 5
-```
-
-### Radviz
+We start by loading the `GatingSet` :
 
 ```{r}
-plot(pheno.rv)+
-    geom_density2d(data = . %>%
-                       mutate(Population = factor(live.fsom.clusters)) %>%
-                       filter(live.fsom.metaclusters==cur.meta),
-                   color = "grey30")+
-    geom_density2d(data = . %>% 
-                       mutate(Population = factor(live.fsom.clusters)) %>% 
-                       filter(live.fsom.metaclusters==cur.meta) %>% 
-                       sample_frac(0.1),
-                   aes(color = Population))
+.gs <- load_gs(file.path("..",tar_read(params_path)))
 ```
 
-### Fan plot
+Then use `gs_get_pop_paths` to list the available gates:
 
 ```{r}
-live.df %>% 
-    mutate(Population = factor(live.fsom.clusters)) %>% 
-    filter(live.fsom.metaclusters==cur.meta) %>% 
-    select(Population,with(markers,name[type %in% c("phenotypic",
-                                                    "functional")])) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
-    mutate(Channel = factor(Channel,
-                            levels = c(rownames(springs(pheno.rv)),
-                                       rownames(springs(func.rv))))) %>% 
-    ggplot(aes(x = Channel,
-               y = value))+
-    geom_fan()+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-    facet_grid(rows = vars(Population))
+gs_get_pop_paths(.gs)
 ```
+
+And select the populations of interest (here by name, can also be by indices):
+
+```{r}
+pops <- c("/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD4+",
+          "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD8+",
+          "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD8+/TNFstim",
+          "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD4+/TNFstim",
+          "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD8+/IFNstim",
+          "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD4+/IFNstim")
+```
+
+Based on pops we iterate over each `GatingHierarchy` and each population to extract cell-level population assignments; the results are turned into a `tibble`:
+
+```{r}
+pops.ids <- lapply(.gs,
+                   function(gh) {
+                       ids <- lapply(pops,function(pop) {
+                           gh_pop_get_indices(gh,pop)
+                       })
+                       ids <- do.call(cbind, ids)
+                       ids <- ids[gh_pop_get_indices(gh,                                                     tar_read(params_population)),]
+                       colnames(ids) <- pops
+                       as_tibble(ids)
+                   })
+pops.ids <- bind_rows(pops.ids,
+                      .id = "name")
+pops.ids
+```
+
+We can then add metacluster information and generate a heatmap of metaclusters to gates:
+
+```{r}
+pops.ids %>% 
+    rename_at(vars(contains(tar_read(params_population))),
+              ~ str_replace(.x,
+                            fixed(tar_read(params_population)),
+                            "")) %>% 
+    mutate(Metaclusters = live.fsom.metaclusters) %>% 
+    gather("Population","i",
+           -c(name,Metaclusters)) %>% 
+    filter(i) %>% 
+    count(Population,Metaclusters) %>% 
+    ggplot(aes(x = Metaclusters,
+               y = Population))+
+    geom_tile(aes(fill = n))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
