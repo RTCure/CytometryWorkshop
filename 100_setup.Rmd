@@ -47,7 +47,7 @@ We need to define:
 
 ```{targets params}
 list(tar_target(params_path,
-                "process\\workshop\\live"),
+                file.path("process","workshop","live")),
      tar_target(params_population,
                 "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"),
      tar_target(params_ref_markers,
