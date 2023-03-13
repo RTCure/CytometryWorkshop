@@ -1,0 +1,50 @@
+---
+title: "Cytometry Workflow 6 - Drilldown"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(targets)
+library(tarchetypes)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM",
+                              "yaml","tidyverse")))
+```
+
+# Render the `_drilldown` report
+
+We will visualize the results and run more exploration in the `_analysis` report:
+
+```{targets analysis-report}
+tarchetypes::tar_render(analysis,
+                        "reports/_drilldown.Rmd",
+                        params = list(store = tar_config_get("store")))
+```
+
+# Run the pipeline
+
+```{r}
+tar_make()
+```
