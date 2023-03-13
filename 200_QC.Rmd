@@ -64,14 +64,18 @@ To identify potential batch effects associated to channel intensity we use the *
 .mem <- asinh(.mem)
 rownames(.mem) <- names(.mats.med)
 .mem <- .mem[-.ref,]
-.mem
+list(MED = .mats.med,
+     IQR = .mats.iqr,
+     REF = .ref,
+     MEM = .mem)
 ```
 
 We prepare a basic plot for reporting:
 
 ```{targets mem-plot, tar_interactive=FALSE}
 tar_target(live.mem.plot, {
-    as_tibble(live.mem,rownames = "id") %>% 
+    as_tibble(live.mem[["MEM"]],
+              rownames = "id") %>% 
         gather("name","MEM",-id) %>% 
         left_join(markers[,c("name","desc")],
                   by = "name") %>% 
