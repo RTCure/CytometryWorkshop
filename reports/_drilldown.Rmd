@@ -3,10 +3,6 @@ title: "Visualizing Workflow Output"
 params:
   store: "..\\_targets"
 output:
-  html_document:
-    toc: yes
-    toc_depth: '4'
-    df_print: paged
   html_notebook:
     df_print: paged
     code_folding: show
