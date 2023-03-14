@@ -37,8 +37,8 @@ tar_option_set(packages = c(c("MASS","cluster",
 
 We will visualize the results and run more exploration in the `_analysis` report:
 
-```{targets analysis-report}
-tarchetypes::tar_render(analysis,
+```{targets drilldown-report}
+tarchetypes::tar_render(drilldown,
                         "reports/_drilldown.Rmd",
                         params = list(store = tar_config_get("store")))
 ```
