@@ -9,5 +9,6 @@ process/
 src/
 
 *.htm*
-_targets*
+*.zip
 
+_targets*
