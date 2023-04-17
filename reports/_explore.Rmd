@@ -36,13 +36,14 @@ tar_load(live.hilbert.proj)
 tar_load(pheno.rv)
 tar_load(func.rv)
 tar_load(live.tsne.proj)
+tar_load(live.hilbert.dist)
 ```
 
 # MEM results
 
 ```{r}
 live.mem.plot+
-    geom_point()+
+    geom_point(aes(color = Stimulation))+
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -50,8 +51,15 @@ live.mem.plot+
 
 ```{r}
 live.hilbert.proj+
-    geom_point(aes(size = N))
+    geom_line(aes(group = Individual))+
+    geom_point(aes(color = Stimulation,
+                   size = N))
 ```
+
+```{r,fig.height=8}
+plot(hclust(live.hilbert.dist))
+```
+
 
 # Radviz {.tabset}
 
@@ -59,12 +67,12 @@ live.hilbert.proj+
 
 ```{r}
 plot(pheno.rv)+
-    geom_density2d()
+    geom_density2d(aes(color = Stimulation))
 ```
 
 ## Functional
 
 ```{r}
 plot(func.rv)+
-    geom_density2d()
+    geom_density2d(aes(color = Stimulation))
 ```
