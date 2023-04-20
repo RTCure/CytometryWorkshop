@@ -38,9 +38,9 @@ params_cur_pop <- "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"
 # unlink(file.path(process.dir,exp.id,"live"),
 #        recursive = TRUE)
 
-raw.files <- dir(file.path(input.dir,"raw"),
-                 pattern="fcs$")
-raw.files <- raw.files[str_detect(raw.files,"THC")]
+(raw.files <- dir(file.path(input.dir,"raw"),
+                 pattern="fcs$"))
+(raw.files <- raw.files[str_detect(raw.files,"THC")])
 
 rawSet <- cytobank_to_gatingset(file.path(input.dir,"raw",
                                           params_gate_filename),
