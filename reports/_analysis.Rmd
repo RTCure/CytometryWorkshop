@@ -149,9 +149,10 @@ ksink <- lapply(cur.pops,function(cur.pop) {
         filter(Population==cur.pop) %>% 
         mutate(`Percent cells` = Count/Total,
                i = dense_rank(`Percent cells`)) %>% 
-        ggplot(aes(x = i,
+        ggplot(aes(x = Stimulation,
                    y = `Percent cells`))+
-        geom_point()+
+        geom_line(aes(group = Individual))+
+        geom_point(aes(color = Stimulation))+
         scale_y_continuous(labels = scales::percent_format())+
         facet_grid(cols=vars(Population))
     print(cur.plot)

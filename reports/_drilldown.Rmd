@@ -115,7 +115,7 @@ live.df %>%
 Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
 
 ```{r}
-cur.metas <- c(3,5,9)
+cur.metas <- c(4,6)
 ```
 
 ```{r}
@@ -200,7 +200,7 @@ live.df %>%
 Metaclusters are composed of clusters, so let's drill down when level deeper
 
 ```{r}
-cur.meta <- 5
+cur.meta <- 4
 ```
 
 ### Radviz
