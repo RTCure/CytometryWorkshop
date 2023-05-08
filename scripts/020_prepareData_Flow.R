@@ -33,6 +33,23 @@ params_func_markers <- "CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR
 params_flow_filename <- "your_workspace.wsp"
 params_cur_pop <- "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"
 
+######################## regular expressions ########################
+# make sure everything does an exact string match
+params_ref_markers <- str_replace_all(params_ref_markers,
+                                      "\\|",
+                                      "$|")
+params_ref_markers <- paste0(params_ref_markers,"$")
+
+params_pheno_markers <- str_replace_all(params_pheno_markers,
+                                        "\\|",
+                                        "$|")
+params_pheno_markers <- paste0(params_pheno_markers,"$")
+
+params_func_markers <- str_replace_all(params_func_markers,
+                                       "\\|",
+                                       "$|")
+params_func_markers <- paste0(params_func_markers,"$")
+
 ######################## load data #############################
 
 unlink(file.path(process.dir,exp.id,"live"),

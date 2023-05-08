@@ -26,17 +26,34 @@ if(!file.exists(file.path(output.dir,exp.id))) {
                showWarnings = FALSE)
 }
 
-params_ref_markers <- "(cells|dead|CD45|CD3)"
+params_ref_markers <- "cells[1-2]|dead|CD45|CD3"
 params_pheno_markers <- "CD127|CD4|CD8|TBET|CD25|gdTCR|CD45RA|CD27|FOXP3|CD56"
 params_func_markers <- "CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR3|CD161|IL-10|CCR7|IL21|CTLA4|CXCR5|IL17F|HLA-DR|IFNg|TNF"
 
 params_gate_filename <- "gates_workshop.xml"
 params_cur_pop <- "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"
 
+######################## regular expressions ########################
+# make sure everything does an exact string match
+params_ref_markers <- str_replace_all(params_ref_markers,
+                                      "\\|",
+                                      "$|")
+params_ref_markers <- paste0(params_ref_markers,"$")
+
+params_pheno_markers <- str_replace_all(params_pheno_markers,
+                                        "\\|",
+                                        "$|")
+params_pheno_markers <- paste0(params_pheno_markers,"$")
+
+params_func_markers <- str_replace_all(params_func_markers,
+                                       "\\|",
+                                       "$|")
+params_func_markers <- paste0(params_func_markers,"$")
+
 ######################## load data #############################
 
-# unlink(file.path(process.dir,exp.id,"live"),
-#        recursive = TRUE)
+unlink(file.path(process.dir,exp.id,"live"),
+       recursive = TRUE)
 
 raw.files <- dir(file.path(input.dir,"raw"),
                  pattern="fcs$")
@@ -63,12 +80,12 @@ as_tibble(pData(parameters(gs_cyto_data(rawSet)[[1]])),
         str_detect(desc,params_pheno_markers) ~ "phenotypic",
         str_detect(desc,params_func_markers) ~ "functional",
         TRUE ~ "CyTOF"),
-    desc = if_else(is.na(desc),
-                   name,
-                   desc),
-    desc = make.names(desc),
-    type = factor(type,
-                  levels = c("reference","phenotypic","functional","CyTOF")))
+        desc = if_else(is.na(desc),
+                       name,
+                       desc),
+        desc = make.names(desc),
+        type = factor(type,
+                      levels = c("reference","phenotypic","functional","CyTOF")))
 
 ################### prepare annotations ########################
 tibble(name = sampleNames(rawSet))
