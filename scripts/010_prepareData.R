@@ -3,7 +3,7 @@
 #
 ################################################################
 
-################# libraries & parameters #######################
+## ---- libraries & parameters ----
 
 library(CytoML)
 library(flowWorkspace)
@@ -14,7 +14,7 @@ library(ggcyto)
 library(tidyverse)
 
 ## parameters
-input.dir <- "input"
+input.dir <- file.path("input","KI")
 process.dir <- "process"
 output.dir <- "output"
 
@@ -26,192 +26,99 @@ if(!file.exists(file.path(output.dir,exp.id))) {
                showWarnings = FALSE)
 }
 
-params_ref_markers <- "cells[1-2]|dead|CD45|CD3"
-params_pheno_markers <- "CD127|CD4|CD8|TBET|CD25|gdTCR|CD45RA|CD27|FOXP3|CD56"
-params_func_markers <- "CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR3|CD161|IL-10|CCR7|IL21|CTLA4|CXCR5|IL17F|HLA-DR|IFNg|TNF"
-
-params_gate_filename <- "gates_workshop.xml"
-params_cur_pop <- "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"
-
-######################## regular expressions ########################
-# make sure everything does an exact string match
-params_ref_markers <- str_replace_all(params_ref_markers,
-                                      "\\|",
-                                      "$|")
-params_ref_markers <- paste0(params_ref_markers,"$")
-
-params_pheno_markers <- str_replace_all(params_pheno_markers,
-                                        "\\|",
-                                        "$|")
-params_pheno_markers <- paste0(params_pheno_markers,"$")
-
-params_func_markers <- str_replace_all(params_func_markers,
-                                       "\\|",
-                                       "$|")
-params_func_markers <- paste0(params_func_markers,"$")
-
-######################## load data #############################
+## ---- load data ----
 
 unlink(file.path(process.dir,exp.id,"live"),
        recursive = TRUE)
 
-raw.files <- dir(file.path(input.dir,"raw"),
-                 pattern="fcs$")
-raw.files <- raw.files[str_detect(raw.files,"THC")]
+params_flow_filename <- file.path("5hPMA_Iono","30-Oct-2023MGS.wsp")
 
-rawSet <- cytobank_to_gatingset(file.path(input.dir,"raw",
-                                          params_gate_filename),
-                                file.path(input.dir,"raw",
-                                          raw.files))
+fj <- CytoML::open_flowjo_xml(file.path(input.dir,params_flow_filename))
+rawSet <- flowjo_to_gatingset(fj,
+                              name = 1)
 
-##################### prepare markers ##########################
+plot(rawSet)
+
+## ---- review markers ----
 
 as_tibble(pData(parameters(gs_cyto_data(rawSet)[[1]])),
-          rownames = "id")
+          rownames = "id") %>% 
+    View()
 
-.markers <- as_tibble(pData(parameters(gs_cyto_data(rawSet)[[1]])),
-                      rownames = "id") %>% 
-    mutate(desc_orig = desc) %>% 
-    separate(desc,
-             c("isotope","desc"),
-             sep = "_") %>% 
-    mutate(type = case_when(
-        str_detect(desc,params_ref_markers) ~ "reference",
-        str_detect(desc,params_pheno_markers) ~ "phenotypic",
-        str_detect(desc,params_func_markers) ~ "functional",
-        TRUE ~ "CyTOF"),
-        desc = if_else(is.na(desc),
-                       name,
-                       desc),
-        desc = make.names(desc),
-        type = factor(type,
-                      levels = c("reference","phenotypic","functional","CyTOF")))
-
-################### prepare annotations ########################
-tibble(name = sampleNames(rawSet))
-
-.annots <- tibble(name = sampleNames(rawSet)) %>% 
-    mutate(Experiment = str_extract(name,"[0-9]{6}"),
-           Experiment = factor(Experiment),
-           Stimulation = str_extract(name,"(rest)|(stim)"),
-           Stimulation = factor(Stimulation,
-                                levels = c("rest","stim")),
-           Individual = str_extract(name,"SK[0-9]{3}"),
-           Individual = factor(Individual))
-
-################## apply transformations #######################
-
-asinhTrans <- asinhtGml2_trans(T=5.8760059682190064,
-                               M=0.43429448190325176,
-                               A=0.0)
+## ---- review transformations ----
 
 trans <- gh_get_transformations(rawSet[[1]])
 
-trans_channels <- .markers %>% 
-    dplyr::filter(!name %in% names(trans),
-                  type %in% c("phenotypic","functional")) %>% 
-    distinct(name)
+names(trans)
+lapply(trans,attr,"type")
 
-(trans_channels <- trans_channels[,"name",drop=TRUE])
+as_tibble(pData(parameters(gs_cyto_data(rawSet)[[1]])),
+          rownames = "id") %>% 
+    filter(!name %in% names(trans))
 
-rawSet <- transform(rawSet,
-                    transformerList(from=trans_channels,
-                                    trans=asinhTrans))
+(trans_channels <- c()) # add extra markers that need to be transformed here
 
-##################### add extra gates ##########################
+if(length(trans_channels)>0) {
+    trans.list <- estimateLogicle(rawSet[[1]],
+                                  trans_channels)
+    rawSet <- transform(rawSet,
+                        trans.list)
+}
+
+## ---- review annotations ----
+
+pData(rawSet) %>% 
+    View()
+
+## ---- review gates & channels ----
 
 gs_get_pop_paths(rawSet)
 
-gs_add_gating_method(rawSet, 
-                     gating_method = "mindensity", 
-                     dims = "145Nd_CD4", 
-                     parent = "CD45:CD3",
-                     pop = "+",
-                     alias = "CD4+")
+autoplot(rawSet[[1]],
+         gs_get_pop_paths(rawSet)[-1])
 
-gs_add_gating_method(rawSet, 
-                     gating_method = "mindensity", 
-                     dims = "146Nd_CD8", 
-                     parent = "CD45:CD3", 
-                     pop = "+",
-                     alias = "CD8+")
+autoplot(rawSet[[1]],
+         str_subset(gs_get_pop_paths(rawSet),"CD8"))+
+    geom_stats(type = c("gate_name","percent"))
 
 ggcyto(rawSet,
+       aes(x = CD3),
+       subset = "live")+
+    geom_density()
+
+ggcyto(rawSet[1],
+       aes(x = CD3),
+       subset = "live")+
+    geom_density()
+
+ggcyto(rawSet[1],
+       aes(x = CD4),
+       subset = "CD3 subset, FSC-A")+
+    geom_density()
+
+ggcyto(rawSet[1],
+       aes(x = gd),
+       subset = "CD3 subset, FSC-A")+
+    geom_density()
+
+ggcyto(rawSet[c(1,2)],
        aes(x = CD4,
-           y = CD8),
-       subset = "CD45:CD3")+
+           y = gd),
+       subset = "CD3 subset, FSC-A")+
     geom_hex()+
-    geom_gate("CD4+")+
-    geom_gate("CD8+")
+    geom_gate("CD4")+
+    geom_stats("CD4",
+               type = c("gate_name","percent"))+
+    geom_gate("gd")+
+    geom_stats("gd",
+               type = c("gate_name","percent"))+
+    geom_gate("CD8 ")+
+    geom_stats("CD8 ",
+               type = c("gate_name","percent"))
 
-## add a TNF gate to CD4 and CD8
-ggcyto(rawSet,
-       aes(x = TNF,
-           y = CD8),
-       subset = "CD8+")+
-    geom_hex()
+## ---- save GatingSet ----
 
-g <- lapply(rawSet,function(gh) {
-    mindensity(gh_pop_get_data(gh,
-                               "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD8+"),
-               "Lu175Di", filterId = "TNFstim")
-})
-
-lapply(str_which(names(g),"stim"),function(i) {
-    gs_pop_add(rawSet[[c(i-1,i)]],
-               g[[i]],
-               parent = "CD8+")
-})
-
-# gs_pop_add(rawSet,
-#            any.gate,
-#            parent = "CD8+")
-
-ggcyto(rawSet,
-       aes(x = TNF,
-           y = CD8),
-       subset = "CD8+")+
-    geom_hex()+
-    geom_gate("TNFstim")
-
-g <- lapply(rawSet,function(gh) {
-    mindensity(gh_pop_get_data(gh,
-                               "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD4+"),
-               "Lu175Di", filterId = "TNFstim")
-})
-
-lapply(str_which(names(g),"stim"),function(i) {
-    gs_pop_add(rawSet[[c(i-1,i)]],
-               g[[i]],
-               parent = "CD4+")
-})
-
-## add a IFNg gate to CD4 and CD8
-g <- lapply(rawSet,function(gh) {
-    mindensity(gh_pop_get_data(gh,
-                               "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD8+"),
-               "Yb174Di", filterId = "IFNstim")
-})
-
-lapply(str_which(names(g),"stim"),function(i) {
-    gs_pop_add(rawSet[[c(i-1,i)]],
-               g[[i]],
-               parent = "CD8+")
-})
-
-g <- lapply(rawSet,function(gh) {
-    mindensity(gh_pop_get_data(gh,
-                               "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3/CD4+"),
-               "Yb174Di", filterId = "IFNstim")
-})
-
-lapply(str_which(names(g),"stim"),function(i) {
-    gs_pop_add(rawSet[[c(i-1,i)]],
-               g[[i]],
-               parent = "CD4+")
-})
-
-## make sure all gates are up-to-date
+## make sure everything is up-to-date
 recompute(rawSet)
 
 save_gs(rawSet,
