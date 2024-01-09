@@ -26,10 +26,16 @@ if(!file.exists(file.path(output.dir,exp.id))) {
                showWarnings = FALSE)
 }
 
-## ---- load data ----
+if(!file.exists(file.path(process.dir,exp.id,"live"))) {
+    dir.create(file.path(process.dir,exp.id),
+               recursive = TRUE,
+               showWarnings = FALSE)
+} else {
+    unlink(file.path(process.dir,exp.id,"live"),
+           recursive = TRUE)
+}
 
-unlink(file.path(process.dir,exp.id,"live"),
-       recursive = TRUE)
+## ---- load data ----
 
 params_flow_filename <- file.path("5hPMA_Iono","30-Oct-2023MGS.wsp")
 
