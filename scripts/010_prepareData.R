@@ -30,9 +30,6 @@ if(!file.exists(file.path(process.dir,exp.id,"live"))) {
     dir.create(file.path(process.dir,exp.id),
                recursive = TRUE,
                showWarnings = FALSE)
-} else {
-    unlink(file.path(process.dir,exp.id,"live"),
-           recursive = TRUE)
 }
 
 ## ---- load data ----
@@ -126,6 +123,9 @@ ggcyto(rawSet[c(1,2)],
 
 ## make sure everything is up-to-date
 recompute(rawSet)
+
+unlink(file.path(process.dir,exp.id,"live"),
+       recursive = TRUE)
 
 save_gs(rawSet,
         path = file.path(process.dir,exp.id,"live"),
