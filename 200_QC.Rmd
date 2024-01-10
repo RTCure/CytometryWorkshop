@@ -129,6 +129,6 @@ as_tibble(.proj$points,
 
 # Run the pipeline
 
-```{r}
+```{r run}
 tar_make()
 ```

@@ -107,6 +107,6 @@ tarchetypes::tar_render(explore,
 
 # Run the pipeline
 
-```{r}
+```{r run}
 tar_make()
 ```

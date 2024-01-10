@@ -135,7 +135,7 @@ list(
 
 # Run the pipeline
 
-```{r}
+```{r run}
 tar_make()
 ```
 
