@@ -50,22 +50,14 @@ We need to define:
 list(tar_target(params_path,
                 file.path("process","workshop","live")),
      tar_target(params_population,
-                "/Bead Removal/Intact cells/Singlets/Viable/CD45+/CD45:CD3"),
+                "/Lymphocytes+Monocytes/Single Cells/live/CD3 subset, FSC-A"),
      tar_target(params_ref_markers,
-                paste0(str_replace_all("cells[1-2]|dead|CD45|CD3",
-                                       "\\|",
-                                       "$|"),
-                       "$")),
+                c('LIVE','CD14','CD3','CD8')),
      tar_target(params_pheno_markers,
-                paste0(str_replace_all("CD127|CD4|CD8|TBET|CD25|gdTCR|CD45RA|CD27|FOXP3|CD56",
-                                       "\\|",
-                                       "$|"),
-                       "$")),
+                c('CD25','CD4','CD45RA','FOXP3','gd')),
      tar_target(params_func_markers,
-                paste0(str_replace_all("CCR6|IL4|CD38|IL22|CD28|CXCR4|CCR4|GMCSF|TGFb|IL17a|CXCR3|CD161|IL-10|CCR7|IL21|CTLA4|CXCR5|IL17F|HLA-DR|IFNg|TNF",
-                                       "\\|",
-                                       "$|"),
-                       "$"))
+                c('CCR6','CCR7','CD137','CD69','GMCSF','HLADR','IFNG','IL10',
+                  'IL17A','IL1B','IL6','PRF1','TNF'))
 )
 ```
 
@@ -76,12 +68,13 @@ Sample annotation can be either parsed from FCS file names (as below) or loaded 
 ```{targets annots, tar_simple=TRUE}
 .gs <- load_gs(params_path)
 tibble(name = sampleNames(.gs)) %>% 
-    mutate(Experiment = str_extract(name,"[0-9]{6}"),
+    mutate(Experiment = str_extract(name,"[0-9]{8}"),
            Experiment = factor(Experiment),
-           Stimulation = str_extract(name,"(rest)|(stim)"),
+           Stimulation = str_extract(name,"(unstim|PMA Iono)_"),
            Stimulation = factor(Stimulation,
-                                levels = c("rest","stim")),
-           Individual = str_extract(name,"SK[0-9]{3}"),
+                                levels = c("unstim_","PMA Iono_"),
+                                labels = c("unstim","PMA Iono")),
+           Individual = str_extract(name,"(Amy|HC)[0-9]{1,2}"),
            Individual = factor(Individual))
 ```
 
@@ -94,22 +87,18 @@ It's easier to get started from the file associated with the `GatingSet` being a
 ```{targets markers, tar_simple=TRUE}
 .gs <- load_gs(params_path)
 as_tibble(pData(parameters(gs_cyto_data(.gs)[[1]])),
-                      rownames = "id") %>% 
-    mutate(desc_orig = desc) %>% 
-    separate(desc,
-             c("isotope","desc"),
-             sep = "_") %>% 
-    mutate(type = case_when(
-        str_detect(desc,params_ref_markers) ~ "reference",
-        str_detect(desc,params_pheno_markers) ~ "phenotypic",
-        str_detect(desc,params_func_markers) ~ "functional",
-        TRUE ~ "CyTOF"),
-    desc = if_else(is.na(desc),
-                   name,
-                   desc),
-    desc = make.names(desc),
-    type = factor(type,
-                  levels = c("reference","phenotypic","functional","CyTOF")))
+          rownames = "id") %>% 
+    mutate(desc = if_else(is.na(desc),
+                          name,
+                          desc),
+           type = case_when(
+               desc %in% params_ref_markers ~ "reference",
+               desc %in% params_pheno_markers ~ "phenotypic",
+               desc %in% params_func_markers ~ "functional",
+               TRUE ~ "Other"),
+           desc = make.names(desc),
+           type = factor(type,
+                         levels = c("reference","phenotypic","functional","Other")))
 ```
 
 # Extract the data
