@@ -30,6 +30,7 @@ tar_option_set(packages = c(c("MASS","cluster",
                               "lme4","emmeans",
                               "FlowSOM","Rtsne",
                               "yaml","tidyverse")))
+source("scripts/900_functions.R")
 ```
 
 # Radviz
@@ -63,30 +64,14 @@ list(
             as.matrix(.) %>% 
             cosine(.)
     }),
-    tar_target(pheno.S,{
-        .pheno.S <- make.S(with(markers,
-                                desc[type=="phenotypic"]))
-        .pheno.optim <- lapply(seq(1,10),function(i) {
-            cat('Run #',i,'\n')
-            .optim.cur.cells <- do.optimRadviz(.pheno.S,live.sim,top=75)
-            return(list(best=in.da(make.S(get.optim(.optim.cur.cells)),live.sim),
-                        springs=get.optim(.optim.cur.cells)))
-        })
-        .pheno.optim.best <- lapply(.pheno.optim,function(x) x$best)
-        make.S(.pheno.optim[[which.max(.pheno.optim.best)]]$springs)
-    }),
-    tar_target(func.S,{
-        .func.S <- make.S(with(markers,
-                               desc[type=="functional"]))
-        .func.optim <- lapply(seq(1,10),function(i) {
-            cat('Run #',i,'\n')
-            .optim.cur.cells <- do.optimRadviz(.func.S,live.sim,top=75)
-            return(list(best=in.da(make.S(get.optim(.optim.cur.cells)),live.sim),
-                        springs=get.optim(.optim.cur.cells)))
-        })
-        .func.optim.best <- lapply(.func.optim,function(x) x$best)
-        make.S(.func.optim[[which.max(.func.optim.best)]]$springs)
-    })
+    tar_target(pheno.S,
+               do_optim_wrap(live.sim,
+                             with(markers,
+                                desc[type=="phenotypic"]))),
+    tar_target(func.S,
+               do_optim_wrap(live.sim,
+                             with(markers,
+                                desc[type=="functional"])))
 )
 ```
 

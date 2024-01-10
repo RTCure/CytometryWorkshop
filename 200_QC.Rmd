@@ -30,6 +30,7 @@ tar_option_set(packages = c(c("MASS","cluster",
                               "lme4","emmeans",
                               "FlowSOM","Rtsne",
                               "yaml","tidyverse")))
+source("scripts/900_functions.R")
 ```
 
 # Marker Enrichment Modeling (MEM)
@@ -37,37 +38,7 @@ tar_option_set(packages = c(c("MASS","cluster",
 To identify potential batch effects associated to channel intensity we use the **M**arker **E**nrichment **M**odeling method ([Diggins 2017](https://doi.org/10.1038/nmeth.4149)) with some adaptations:
 
 ```{targets live.mem, tar_simple=TRUE, tar_interactive=FALSE}
-.mats.med <- lapply(live.mats,function(mt,ch) {
-    mm <- apply(mt[,ch],2,median)
-    return(mm)
-},with(markers,name[type %in% c("phenotypic","functional")]))
-
-.mats.iqr <- lapply(live.mats,function(mt,ch) {
-    mi <- apply(mt[,ch],2,IQR)
-    if(min(mi)==0) {
-        thresh <- min(mi[mi>0])
-        thresh <- 10^floor(log10(thresh))
-        mi <- replace(mi,mi==0,thresh)
-    }
-    return(mi)
-},with(markers,name[type %in% c("phenotypic","functional")]))
-
-.ref <- pam(bind_rows(.mats.med),1)
-.ref <- .ref$id.med
-
-.med.diffs <- sweep(bind_rows(.mats.med),2,.mats.med[[.ref]],`-`)
-.iqr.ratio <- sweep(bind_rows(.mats.iqr),2,.mats.iqr[[.ref]],`/`)
-.iqr.ratio <- 1/.iqr.ratio
-
-.mem <- abs(.med.diffs)+.iqr.ratio-1
-.mem[.med.diffs<0] <- -.mem[.med.diffs<0]
-.mem <- asinh(.mem)
-rownames(.mem) <- names(.mats.med)
-.mem <- .mem[-.ref,]
-list(MED = .mats.med,
-     IQR = .mats.iqr,
-     REF = .ref,
-     MEM = .mem)
+do_MEM(live.mats,markers)
 ```
 
 We prepare a basic plot for reporting:
@@ -99,7 +70,7 @@ To identify potential batch effects we compute the similarity between samples us
 ```{targets params-hilbert}
 tar_target(params_hilbert_channels,{
     with(markers,
-         name[type %in%c("phenotypic","functional")])
+         name[type %in% c("phenotypic","functional")])
 })
 ```
 
