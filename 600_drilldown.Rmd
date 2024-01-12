@@ -31,6 +31,7 @@ tar_option_set(packages = c(c("MASS","cluster",
                               "lme4","emmeans",
                               "FlowSOM",
                               "yaml","tidyverse")))
+source("scripts/900_functions.R")
 ```
 
 # Render the `_drilldown` report
