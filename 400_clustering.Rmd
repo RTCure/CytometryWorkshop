@@ -56,9 +56,10 @@ Then we run the clustering algorithm:
 
 ```{targets live.fsom, tar_simple=TRUE}
 .gs <- load_gs(params_path)
+.fs <- gs_pop_get_data(.gs,
+                        params_population)
 
-FlowSOM(gs_pop_get_data(.gs,
-                        params_population),
+FlowSOM(.fs,
         compensate = FALSE,
         transform = FALSE,
         scale = FALSE,

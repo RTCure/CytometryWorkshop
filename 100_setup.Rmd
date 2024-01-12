@@ -109,10 +109,11 @@ To run the analysis we will need to access the expression values stored in the F
 list(
     tar_target(live.mats,{
         .gs <- load_gs(params_path)
-        lapply(.gs,
-               function(gh) {
-                   exprs(gh_pop_get_data(gh,
-                                         params_population))})
+        .fs <- gs_pop_get_data(.gs,
+                               params_population)
+        fsApply(.fs,
+                exprs,
+                simplify = FALSE)
     }),
     tar_target(live.df,{
         bind_rows(lapply(live.mats,
