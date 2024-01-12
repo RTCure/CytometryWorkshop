@@ -43,3 +43,18 @@ do_optim_wrap <- function(live.sim, markers) {
     .optim.best <- lapply(.optim,function(x) x$best)
     make.S(.optim[[which.max(.optim.best)]]$springs)
 }
+
+do_shave <- function(v, fun = range, na.rm = T) {
+    if (na.rm) {
+        clean_v <- v[!is.na(v)]
+    }
+    else {
+        clean_v <- v
+    }
+    range_v <- match.fun(fun)(clean_v)
+    min_v <- min(range_v)
+    max_v <- max(range_v)
+    clean_v[clean_v<min_v] <- min_v
+    clean_v[clean_v>max_v] <- max_v
+    return(clean_v)
+}
