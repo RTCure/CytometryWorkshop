@@ -82,6 +82,16 @@ list(
 )
 ```
 
+# Render the `_clustering` report
+
+We will reviewing the output of clustering in the `_clustering` report:
+
+```{targets clustering-report}
+tarchetypes::tar_render(clustering,
+                        "reports/_clustering.Rmd",
+                        params = list(store = tar_config_get("store")))
+```
+
 # Run the pipeline
 
 ```{r run}

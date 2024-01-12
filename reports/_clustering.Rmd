@@ -1,0 +1,101 @@
+---
+title: "Reviewing the clustering results"
+params:
+  store: !r file.path("..","_targets")
+output:
+  html_notebook:
+    df_print: paged
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+# loading the packages
+
+```{r setup}
+library(targets)
+
+library(knitr)
+
+library(tidyverse)
+
+library(Radviz)
+library(cytofan)
+
+theme_set(theme_light(base_size = 16))
+tar_config_set(store = params$store)
+```
+
+# loading the data
+
+```{r data}
+tar_load(markers)
+tar_load(annots)
+tar_load(live.df)
+tar_load(params_fsom_channels)
+tar_load(live.fsom.clusters)
+tar_load(live.fsom.metaclusters)
+```
+
+# Metacluster profiles {.tabset}
+
+We start by computing the median channel intensity per metacluster:
+
+```{r}
+live.metas.channels <- live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    select(all_of(c("Population",params_fsom_channels))) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    group_by(Channel) %>% 
+    mutate(value = do_shave(value,
+                            fun = function(x) quantile(x,c(0.005,0.995)))) %>% 
+    group_by(Population,Channel) %>% 
+    summarize(value = median(value),
+              .groups = "drop_last")
+```
+
+
+Let's visualize metaclusters as heatmaps:
+
+## Median intensity
+
+```{r, fig.width = 8}
+ live.metas.channels %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = value))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
+## Median intensity (normalized per channel)
+
+```{r, fig.width = 8}
+live.metas.channels %>% 
+    group_by(Channel) %>% 
+    mutate(value = do.L(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = value))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
+## Median intensity (normalized per population)
+
+```{r, fig.width = 8}
+live.metas.channels %>% 
+    group_by(Population) %>% 
+    mutate(value = do.L(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = Population))+
+    geom_tile(aes(fill = value))+
+    scale_fill_gradient2(low = "grey80",
+                          high = "orangered2")
+```
+
