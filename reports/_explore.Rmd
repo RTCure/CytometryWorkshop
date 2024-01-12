@@ -31,11 +31,45 @@ tar_config_set(store = params$store)
 ```{r data}
 tar_load(markers)
 tar_load(annots)
+tar_load(live.df)
 tar_load(live.mem.plot)
 tar_load(live.hilbert.proj)
 tar_load(pheno.rv)
 tar_load(func.rv)
 tar_load(live.tsne.proj)
+```
+
+# Channel Overview
+
+```{r,fig.width=12,fig.height=9}
+live.df %>%
+    select(all_of(c("name",
+                    with(markers,
+                         name[type %in% c("phenotypic",
+                                          "functional")])))) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !name) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    sample_frac(0.1) %>% 
+    gather(Channel, value,
+           all_of(with(markers,
+                       desc[type %in% c("phenotypic",
+                                        "functional")]))) %>% 
+    mutate(Channel = factor(Channel,
+                            levels = c(rownames(springs(pheno.rv)),
+                                       rownames(springs(func.rv))))) %>% 
+    ggplot(aes(x = value))+
+    geom_density(aes(fill = Stimulation))+
+    geom_vline(data = . %>% 
+                   group_by(Channel) %>% 
+                   summarise(value = quantile(value,c(0.005,0.995))),
+               aes(xintercept = value),
+               col = 2)+
+    facet_wrap(~Channel,
+               scales = "free_y")+
+    xlim(0,NA)
 ```
 
 # MEM results
