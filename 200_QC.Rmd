@@ -65,37 +65,45 @@ tar_target(live.mem.plot, {
 
 # Hilbert Similarity
 
-To identify potential batch effects we compute the similarity between samples using the `hilbertSimilarity` package ([doi:10.5281/zenodo.3557362](https://zenodo.org/record/3557362)). First we define which markers to include in the analysis:
+To identify potential batch effects we compute the similarity between samples using the `hilbertSimilarity` package ([doi:10.5281/zenodo.3557362](https://zenodo.org/record/3557362)). First we define which markers to include in the analysis, and the number of bins we will use:
 
 ```{targets params-hilbert}
-tar_target(params_hilbert_channels,{
-    with(markers,
-         name[type %in% c("phenotypic","functional")])
-})
+list(
+    tar_target(params_hilbert_channels,{
+        with(markers,
+             name[type %in% c("phenotypic","functional")])
+    }),
+    tar_target(params_hilbert_nbins,
+               2)
+)
 ```
 
-Next we associate every cell in the dataset to a value on the Hilbert curve defined over all selected channels:
+Next we associate every cell in the dataset to a value on the Hilbert curve defined over all selected channels, first by defining cuts:
 
-```{targets live.hilbert, tar_simple=TRUE, tar_interactive=FALSE}
+```{targets live.hilbert.cuts, tar_simple=TRUE, tar_interactive=FALSE}
 ## create the cuts 
-.nbins <- 2
-
 .cuts <- live.df %>% 
     select(all_of(params_hilbert_channels)) %>% 
     as.matrix() %>% 
     make.cut(.,
-             n=.nbins+1,
+             n=params_hilbert_nbins+1,
              count.lim=40)
+```
 
+then by applying those cuts:
+
+```{targets live.hilbert, tar_simple=TRUE, tar_interactive=FALSE}
 ## apply the cuts
 .cutMat <- live.df %>% 
     select(all_of(params_hilbert_channels)) %>% 
     as.matrix() %>% 
-    do.cut(.,.cuts,
+    do.cut(.,
+           live.hilbert.cuts,
            type='combined')
 
 ## generate the hilbert index
-do.hilbert(.cutMat,.nbins)
+do.hilbert(.cutMat,
+           params_hilbert_nbins)
 ```
 
 Based on the Hilbert index we compute the composition of every sample and determine sample similarity using the Jensen-Shannon distance:
