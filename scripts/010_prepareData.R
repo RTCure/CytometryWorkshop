@@ -40,6 +40,9 @@ fj <- CytoML::open_flowjo_xml(file.path(input.dir,params_flow_filename))
 rawSet <- flowjo_to_gatingset(fj,
                               name = 1)
 
+## make sure everything is up-to-date
+recompute(rawSet)
+
 plot(rawSet)
 
 ## ---- review markers ----
