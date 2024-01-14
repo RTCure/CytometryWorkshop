@@ -95,10 +95,10 @@ as_tibble(pData(parameters(gs_cyto_data(.gs)[[1]])),
                desc %in% params_ref_markers ~ "reference",
                desc %in% params_pheno_markers ~ "phenotypic",
                desc %in% params_func_markers ~ "functional",
-               TRUE ~ "Other"),
+               TRUE ~ "other"),
            desc = make.names(desc),
            type = factor(type,
-                         levels = c("reference","phenotypic","functional","Other")))
+                         levels = c("reference","phenotypic","functional","other")))
 ```
 
 # Extract the data
