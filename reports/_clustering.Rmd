@@ -59,7 +59,6 @@ live.metas.channels <- live.df %>%
               .groups = "drop_last")
 ```
 
-
 Let's visualize metaclusters as heatmaps:
 
 ## Median intensity

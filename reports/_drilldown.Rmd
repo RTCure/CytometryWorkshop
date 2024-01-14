@@ -42,21 +42,28 @@ tar_load(metas.df)
 
 # Metacluster profiles {.tabset}
 
-Let's visualize metaclusters as heatmaps:
+We start by computing the median channel intensity per metacluster:
 
-## Median intensity
-
-```{r, fig.width = 8}
-live.df %>% 
+```{r}
+live.metas.channels <- live.df %>% 
     mutate(Population = live.fsom.metaclusters) %>% 
-    select(Population,with(markers,name[type=="phenotypic"])) %>% 
+    select(all_of(c("Population",params_fsom_channels))) %>% 
     rename_with(~ with(markers,
                        desc[match(.x,name)]),
                 !Population) %>% 
     gather("Channel","value",
            -Population) %>% 
     group_by(Population,Channel) %>% 
-    summarize(value = median(value)) %>% 
+    summarize(value = median(value),
+              .groups = "drop_last")
+```
+
+Let's visualize metaclusters as heatmaps:
+
+## Median intensity
+
+```{r, fig.width = 8}
+live.metas.channels %>% 
     ggplot(aes(x = Channel,
                y = Population))+
     geom_tile(aes(fill = value))+
@@ -67,16 +74,7 @@ live.df %>%
 ## Median intensity (normalized per channel)
 
 ```{r, fig.width = 8}
-live.df %>% 
-    mutate(Population = live.fsom.metaclusters) %>% 
-    select(Population,with(markers,name[type=="phenotypic"])) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
-    group_by(Population,Channel) %>%
-    summarize(value = median(value)) %>% 
+live.metas.channels %>% 
     group_by(Channel) %>% 
     mutate(value = do.L(value)) %>% 
     ggplot(aes(x = Channel,
@@ -89,16 +87,7 @@ live.df %>%
 ## Median intensity (normalized per population)
 
 ```{r, fig.width = 8}
-live.df %>% 
-    mutate(Population = live.fsom.metaclusters) %>% 
-    select(Population,with(markers,name[type=="phenotypic"])) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
-    group_by(Population,Channel) %>%
-    summarize(value = median(value)) %>% 
+live.metas.channels %>% 
     group_by(Population) %>% 
     mutate(value = do.L(value)) %>% 
     ggplot(aes(x = Channel,
