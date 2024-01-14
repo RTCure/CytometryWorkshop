@@ -43,8 +43,8 @@ On top of manual gating we use `FlowSOM` ([Van Gassen 2015](https://doi.org/10.1
  
 ```{targets params-fsom}
 list(
-    tar_target(params_fsom_grid,7),
-    tar_target(params_fsom_nclus,10),
+    tar_target(params_fsom_grid,10),
+    tar_target(params_fsom_nclus,30),
     tar_target(params_fsom_channels,{
         with(markers,
              name[type %in% c("phenotypic")])

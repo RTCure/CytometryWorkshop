@@ -50,14 +50,13 @@ We need to define:
 list(tar_target(params_path,
                 file.path("process","workshop","live")),
      tar_target(params_population,
-                "/Lymphocytes+Monocytes/Single Cells/live/CD3 subset, FSC-A"),
+                NULL),
      tar_target(params_ref_markers,
-                c('LIVE','CD14','CD3','CD8')),
+                NULL),
      tar_target(params_pheno_markers,
-                c('CD25','CD4','CD45RA','FOXP3','gd')),
+                NULL),
      tar_target(params_func_markers,
-                c('CCR6','CCR7','CD137','CD69','GMCSF','HLADR','IFNG','IL10',
-                  'IL17A','IL1B','IL6','PRF1','TNF'))
+                NULL)
 )
 ```
 
@@ -67,15 +66,7 @@ Sample annotation can be either parsed from FCS file names (as below) or loaded 
 
 ```{targets annots, tar_simple=TRUE}
 .gs <- load_gs(params_path)
-tibble(name = sampleNames(.gs)) %>% 
-    mutate(Experiment = str_extract(name,"[0-9]{8}"),
-           Experiment = factor(Experiment),
-           Stimulation = str_extract(name,"(unstim|PMA Iono)_"),
-           Stimulation = factor(Stimulation,
-                                levels = c("unstim_","PMA Iono_"),
-                                labels = c("unstim","PMA Iono")),
-           Individual = str_extract(name,"(Amy|HC)[0-9]{1,2}"),
-           Individual = factor(Individual))
+tibble(name = sampleNames(.gs))
 ```
 
 # Marker annotation

@@ -45,7 +45,7 @@ list(
     tar_target(model.total,
                Count ~ Stimulation + (1|Individual) + offset(logTotal)),
     tar_target(live.contrasts,{
-        list("PMA/Iono-Unstim" = c(-1,1))
+        list("pos to neg" = c(-1,1))
     }),
     tar_target(model.total.specs, {
         .specs <- labels(terms(model.total))

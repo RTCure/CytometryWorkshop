@@ -51,9 +51,6 @@ live.metas.channels <- live.df %>%
                 !Population) %>% 
     gather("Channel","value",
            -Population) %>% 
-    group_by(Channel) %>% 
-    mutate(value = do_shave(value,
-                            fun = function(x) quantile(x,c(0.005,0.995)))) %>% 
     group_by(Population,Channel) %>% 
     summarize(value = median(value),
               .groups = "drop_last")

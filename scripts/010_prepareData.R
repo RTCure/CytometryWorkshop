@@ -87,24 +87,9 @@ autoplot(rawSet[[1]],
          str_subset(gs_get_pop_paths(rawSet),"CD8"))+
     geom_stats(type = c("gate_name","percent"))
 
-ggcyto(rawSet,
-       aes(x = CD3),
-       subset = "live")+
-    geom_density()
-
 ggcyto(rawSet[1],
        aes(x = CD3),
        subset = "live")+
-    geom_density()
-
-ggcyto(rawSet[1],
-       aes(x = CD4),
-       subset = "CD3 subset, FSC-A")+
-    geom_density()
-
-ggcyto(rawSet[1],
-       aes(x = gd),
-       subset = "CD3 subset, FSC-A")+
     geom_density()
 
 ggcyto(rawSet[c(1,2)],

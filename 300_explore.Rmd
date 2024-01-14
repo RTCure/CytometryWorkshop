@@ -44,7 +44,7 @@ live.df %>%
                                                "functional")])),
                   ~ do.L(.x,
                          fun=function(x) quantile(x,
-                                                  c(0.005,0.995))))) %>% 
+                                                  c(0,0.975))))) %>% 
     select(all_of(c("name",
                     with(markers,
                          name[type %in% c("phenotypic",
