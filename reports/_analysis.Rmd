@@ -38,6 +38,8 @@ tar_load(live.pop.volcano)
 tar_load(metas.df)
 tar_load(live.meta.contrasts)
 tar_load(live.meta.volcano)
+tar_load(params_fold_lim)
+tar_load(params_pval_lim)
 ```
 
 # Visualizing the results
@@ -54,6 +56,8 @@ live.pop.volcano
 live.pop.contrasts %>% 
     filter(abs(estimate)>1,
            p.adjustFDR<0.05) %>% 
+    filter(abs(estimate)>params_fold_lim,
+           p.adjustFDR<params_pval_lim) %>% 
     mutate(PopName = str_replace(Population,
                                  fixed(params_population),
                                  "")) %>% 
@@ -71,6 +75,9 @@ cur.pops <- live.pop.contrasts %>%
     filter(abs(estimate)>1,
            p.adjustFDR<0.05) %>% 
     distinct(Population,)
+    filter(abs(estimate)>params_fold_lim,
+           p.adjustFDR<params_pval_lim) %>% 
+    distinct(Population)
 cur.pops <- cur.pops$Population
 
 ksink <- lapply(cur.pops,function(cur.pop) {

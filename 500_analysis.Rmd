@@ -42,6 +42,8 @@ First we define the model and contrasts we are interested in:
 
 ```{targets params-analysis}
 list(
+    tar_target(params_fold_lim,0.8),
+    tar_target(params_pval_lim,0.01),
     tar_target(model.total,
                Count ~ Stimulation + (1|Individual) + offset(logTotal)),
     tar_target(live.contrasts,{
@@ -127,8 +129,11 @@ live.pop.contrasts %>%
                y = log.p.value))+
     geom_label(aes(label = PopName))+
     geom_vline(xintercept = c(-1,1),
+    geom_vline(xintercept = c(-params_fold_lim,
+                              params_fold_lim),
                col = 2, lty = 2)+
     geom_hline(yintercept = -log10(0.05),
+    geom_hline(yintercept = -log10(params_pval_lim),
                col = 2, lty = 2)
 ```
 
@@ -193,8 +198,11 @@ live.meta.contrasts %>%
                y = log.p.value))+
     geom_label(aes(label = Population))+
     geom_vline(xintercept = c(-1,1),
+    geom_vline(xintercept = c(-params_fold_lim,
+                              params_fold_lim),
                col = 2, lty = 2)+
     geom_hline(yintercept = -log10(0.05),
+    geom_hline(yintercept = -log10(params_pval_lim),
                col = 2, lty = 2)
 ```
 
