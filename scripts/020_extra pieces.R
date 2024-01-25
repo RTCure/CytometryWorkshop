@@ -1,14 +1,3 @@
-## ---- if extra transformations are required ----
-
-(trans_channels <- c()) # add extra markers that need to be transformed here
-
-if(length(trans_channels)>0) {
-    trans.list <- estimateLogicle(rawSet[[1]],
-                                  trans_channels)
-    rawSet <- transform(rawSet,
-                        trans.list)
-}
-
 ## ---- adding extra automated gates ----
 #
 # gs_add_gating_method(rawSet, 

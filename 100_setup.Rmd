@@ -154,10 +154,10 @@ tar_read(live.df) %>%
                        desc[type %in% c("phenotypic",
                                         "functional")]))) %>% 
     ggplot(aes(x = value))+
-    geom_density(aes(fill = Condition))+
+    geom_density()+
     geom_vline(data = . %>% 
                    group_by(Channel) %>% 
-                   reframe(value = quantile(value,c(0.005,0.995))),
+                   reframe(value = quantile(value,c(0,0.975))),
                aes(xintercept = value),
                col = 2)+
     facet_wrap(~Channel,

@@ -42,12 +42,12 @@ First we define the model and contrasts we are interested in:
 
 ```{targets params-analysis}
 list(
-    tar_target(params_fold_lim,0.8),
-    tar_target(params_pval_lim,0.01),
     tar_target(model.total,
                Count ~ Stimulation + (1|Individual) + offset(logTotal)),
     tar_target(live.contrasts,{
         list("pos to neg" = c(-1,1))
+    tar_target(params_fold_lim,1),
+    tar_target(params_pval_lim,0.05),
     }),
     tar_target(model.total.specs, {
         .specs <- labels(terms(model.total))
