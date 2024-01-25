@@ -63,7 +63,7 @@ live.df %>%
     geom_density(aes(fill = Stimulation))+
     geom_vline(data = . %>% 
                    group_by(Channel) %>% 
-                   summarise(value = quantile(value,c(0.005,0.995))),
+                   reframe(value = quantile(value,c(0.005,0.995))),
                aes(xintercept = value),
                col = 2)+
     facet_wrap(~Channel,
