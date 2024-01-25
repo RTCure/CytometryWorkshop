@@ -36,7 +36,6 @@ tar_load(live.mem.plot)
 tar_load(live.hilbert.proj)
 tar_load(pheno.rv)
 tar_load(func.rv)
-tar_load(live.tsne.proj)
 ```
 
 # Channel Overview
