@@ -45,9 +45,9 @@ list(
     tar_target(params_fold_lim,0.8),
     tar_target(params_pval_lim,0.01),
     tar_target(model.total,
-               Count ~ Stimulation + (1|Individual) + offset(logTotal)),
+               Count ~ Condition + (1|Individual) + offset(logTotal)),
     tar_target(live.contrasts,{
-        list("pos to neg" = c(-1,1))
+        list("PMA_Iono to Unstim" = c(-1,1))
     }),
     tar_target(model.total.specs, {
         .specs <- labels(terms(model.total))
@@ -128,11 +128,9 @@ live.pop.contrasts %>%
     ggplot(aes(x = estimate,
                y = log.p.value))+
     geom_label(aes(label = PopName))+
-    geom_vline(xintercept = c(-1,1),
     geom_vline(xintercept = c(-params_fold_lim,
                               params_fold_lim),
                col = 2, lty = 2)+
-    geom_hline(yintercept = -log10(0.05),
     geom_hline(yintercept = -log10(params_pval_lim),
                col = 2, lty = 2)
 ```
@@ -197,11 +195,9 @@ live.meta.contrasts %>%
     ggplot(aes(x = estimate,
                y = log.p.value))+
     geom_label(aes(label = Population))+
-    geom_vline(xintercept = c(-1,1),
     geom_vline(xintercept = c(-params_fold_lim,
                               params_fold_lim),
                col = 2, lty = 2)+
-    geom_hline(yintercept = -log10(0.05),
     geom_hline(yintercept = -log10(params_pval_lim),
                col = 2, lty = 2)
 ```

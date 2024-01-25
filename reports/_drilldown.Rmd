@@ -23,6 +23,8 @@ library(tidyverse)
 library(Radviz)
 library(cytofan)
 
+source(file.path(getwd(),"scripts","900_functions.R"))
+
 theme_set(theme_light(base_size = 16))
 tar_config_set(store = params$store)
 ```
@@ -35,6 +37,7 @@ tar_load(annots)
 tar_load(live.df)
 tar_load(pheno.rv)
 tar_load(func.rv)
+tar_load(params_fsom_channels)
 tar_load(live.fsom.clusters)
 tar_load(live.fsom.metaclusters)
 tar_load(metas.df)
@@ -104,7 +107,7 @@ live.metas.channels %>%
 Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
 
 ```{r}
-cur.metas <- NULL
+cur.metas <- c(4,5)
 ```
 
 ```{r}
@@ -123,9 +126,28 @@ metas.df %>%
 ```{r}
 plot(pheno.rv)+
     geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   color = "grey80")+
+    geom_density2d(data = . %>% 
                        mutate(Population = live.fsom.metaclusters) %>% 
-                       filter(Population %in% cur.metas),
+                       filter(Population %in% cur.metas) %>% 
+                       sample_frac(0.2),
                    aes(color = Population))
+```
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   color = "grey80")+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas) %>% 
+                       sample_frac(0.2),
+                   aes(color = Population))+
+    facet_grid(cols = vars(Condition))
 ```
 
 ### Functional
@@ -135,61 +157,159 @@ plot(func.rv)+
     geom_density2d(data = . %>% 
                        mutate(Population = live.fsom.metaclusters) %>% 
                        filter(Population %in% cur.metas),
-                   aes(color = Population))
+                   aes(color = Condition))+
+    facet_grid(cols = vars(Population))
 ```
 
 ## Fan plots {.tabset}
 
 Fan plots ([Britton 1998](https://www.bankofengland.co.uk/quarterly-bulletin/1998/q1/the-inflation-report-projections-understanding-the-fan-chart)) have been implemented for cytometry visualization in the [cytofan](https://cran.r-project.org/package=cytofan) package.
 
+```{r}
+live.fan <- live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    filter(Population %in% cur.metas) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    select(Population,
+           colnames(annots),
+           with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    gather("Channel","value",
+           with(markers,desc[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    left_join(markers %>% 
+                  select(desc,type),
+              by = c("Channel"="desc"))
+```
+
 ### Phenotypic
 
 ```{r}
-live.df %>% 
-    mutate(Population = live.fsom.metaclusters) %>% 
-    filter(Population %in% cur.metas) %>% 
-    select(Population,with(markers,name[type=="phenotypic"])) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
     ggplot(aes(x = Channel,
                y = value))+
     geom_fan()+
     theme(axis.text.x = element_text(angle = 45, hjust = 1))+
     facet_grid(rows = vars(Population))
+```
+
+```{r}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Condition),
+               cols = vars(Population))
+```
+
+```{r, fig.height=15, fig.width=12}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Condition,PatientType),
+               cols = vars(Population))
+```
+
+```{r, fig.height=15, fig.width=12}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(PatientType,Condition),
+               cols = vars(Population))
 ```
 
 ### All channels
 
 ```{r}
-live.df %>% 
-    mutate(Population = factor(live.fsom.metaclusters)) %>% 
-    filter(Population %in% cur.metas) %>% 
-    select(Population,with(markers,name[type %in% c("phenotypic",
-                                                    "functional")])) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
-    mutate(Channel = factor(Channel,
-                            levels = c(rownames(springs(pheno.rv)),
-                                       rownames(springs(func.rv))))) %>% 
+live.fan %>% 
     ggplot(aes(x = Channel,
                y = value))+
     geom_fan()+
     theme(axis.text.x = element_text(angle = 45, hjust = 1))+
     facet_grid(rows = vars(Population))
 ```
+
+```{r}
+live.fan %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Condition),
+               cols = vars(Population))
+```
+
+## Line charts
+
+```{r}
+live.line <- live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    filter(Population %in% cur.metas) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    select(Population,
+           colnames(annots),
+           with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    gather("Channel","value",
+           with(markers,desc[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    left_join(markers %>% 
+                  select(desc,type),
+              by = c("Channel"="desc")) %>% 
+    group_by(Experiment, PatientType, Individual, 
+             Condition, Population,Channel) %>% 
+    summarize(value = median(value))
+```
+
+```{r}
+live.line %>% 
+    group_by(Population,Channel) %>% 
+    summarize(value = median(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_line(aes(group = Population,
+                  color = Population),
+              lwd = 1.2)
+```
+
 
 ## Drilling down into a specific metacluster {.tabset}
 
 Metaclusters are composed of clusters, so let's drill down when level deeper
 
 ```{r}
-cur.meta <- NULL
+cur.meta <- 4
 ```
 
 ### Radviz
@@ -209,8 +329,270 @@ plot(pheno.rv)+
 
 ### Fan plot
 
+```{r,fig.height=15,fig.width=12}
+live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
+    mutate(Population = factor(live.fsom.clusters)) %>% 
+    filter(live.fsom.metaclusters==cur.meta) %>% 
+    select(Population,with(markers,name[type %in% c("phenotypic",
+                                                    "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    mutate(Channel = factor(Channel,
+                            levels = c(rownames(springs(pheno.rv)),
+                                       rownames(springs(func.rv))))) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+# Metaclusters of interest #2
+
+*To visualize or compare different subsets, simply copy the whole section and edit the next block.*
+
+Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
+
 ```{r}
-live.df %>% 
+cur.metas <- c(1,7)
+```
+
+```{r}
+metas.df %>% 
+    filter(Population %in% cur.metas) %>%
+    group_by(Population) %>% 
+    summarize(Count = sum(Count),
+              Total = sum(Total)) %>% 
+    mutate(`Percent cells (Total)` = paste0(round(100*Count/Total,1),"%"))
+```
+
+## Radviz {.tabset}
+
+### Phenotypic
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   color = "grey80")+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas) %>% 
+                       sample_frac(0.2),
+                   aes(color = Population))
+```
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   color = "grey80")+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas) %>% 
+                       sample_frac(0.2),
+                   aes(color = Population))+
+    facet_grid(cols = vars(Condition))
+```
+
+### Functional
+
+```{r}
+plot(func.rv)+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas),
+                   aes(color = Condition))+
+    facet_grid(cols = vars(Population))
+```
+
+## Fan plots {.tabset}
+
+Fan plots ([Britton 1998](https://www.bankofengland.co.uk/quarterly-bulletin/1998/q1/the-inflation-report-projections-understanding-the-fan-chart)) have been implemented for cytometry visualization in the [cytofan](https://cran.r-project.org/package=cytofan) package.
+
+```{r}
+live.fan <- live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    filter(Population %in% cur.metas) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    select(Population,
+           colnames(annots),
+           with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    gather("Channel","value",
+           with(markers,desc[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    left_join(markers %>% 
+                  select(desc,type),
+              by = c("Channel"="desc"))
+```
+
+### Phenotypic
+
+```{r}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+```{r}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Condition),
+               cols = vars(Population))
+```
+
+```{r, fig.height=15, fig.width=12}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Condition,PatientType),
+               cols = vars(Population))
+```
+
+```{r, fig.height=15, fig.width=12}
+live.fan %>% 
+    filter(type=="phenotypic") %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(PatientType,Condition),
+               cols = vars(Population))
+```
+
+### All channels
+
+```{r}
+live.fan %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+```{r}
+live.fan %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Condition),
+               cols = vars(Population))
+```
+
+## Line charts
+
+```{r}
+live.line <- live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    filter(Population %in% cur.metas) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    select(Population,
+           colnames(annots),
+           with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                with(markers,name[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    gather("Channel","value",
+           with(markers,desc[type %in% c("phenotypic",
+                                               "functional")])) %>% 
+    left_join(markers %>% 
+                  select(desc,type),
+              by = c("Channel"="desc")) %>% 
+    group_by(Experiment, PatientType, Individual, 
+             Condition, Population,Channel) %>% 
+    summarize(value = median(value))
+```
+
+```{r}
+live.line %>% 
+    group_by(Population,Channel) %>% 
+    summarize(value = median(value)) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_line(aes(group = Population,
+                  color = Population),
+              lwd = 1.2)
+```
+
+
+## Drilling down into a specific metacluster {.tabset}
+
+Metaclusters are composed of clusters, so let's drill down when level deeper
+
+```{r}
+cur.meta <- 7
+```
+
+### Radviz
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>%
+                       mutate(Population = factor(live.fsom.clusters)) %>%
+                       filter(live.fsom.metaclusters==cur.meta),
+                   color = "grey30")+
+    geom_density2d(data = . %>% 
+                       mutate(Population = factor(live.fsom.clusters)) %>% 
+                       filter(live.fsom.metaclusters==cur.meta) %>% 
+                       sample_frac(0.1),
+                   aes(color = Population))
+```
+
+### Fan plot
+
+```{r,fig.height=15,fig.width=12}
+live.df %>%
+    mutate(across(all_of(with(markers,
+                              name[type %in% c("phenotypic",
+                                               "functional")])),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
     mutate(Population = factor(live.fsom.clusters)) %>% 
     filter(live.fsom.metaclusters==cur.meta) %>% 
     select(Population,with(markers,name[type %in% c("phenotypic",

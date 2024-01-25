@@ -54,8 +54,6 @@ live.pop.volcano
 
 ```{r}
 live.pop.contrasts %>% 
-    filter(abs(estimate)>1,
-           p.adjustFDR<0.05) %>% 
     filter(abs(estimate)>params_fold_lim,
            p.adjustFDR<params_pval_lim) %>% 
     mutate(PopName = str_replace(Population,
@@ -72,9 +70,6 @@ live.pop.contrasts %>%
 
 ```{r, results='asis'}
 cur.pops <- live.pop.contrasts %>% 
-    filter(abs(estimate)>1,
-           p.adjustFDR<0.05) %>% 
-    distinct(Population,)
     filter(abs(estimate)>params_fold_lim,
            p.adjustFDR<params_pval_lim) %>% 
     distinct(Population)
@@ -103,9 +98,10 @@ ksink <- lapply(cur.pops,function(cur.pop) {
                                      ""),
                `Percent cells` = Count/Total,
                i = dense_rank(`Percent cells`)) %>% 
-        ggplot(aes(x = i,
+        ggplot(aes(x = Condition,
                    y = `Percent cells`))+
-        geom_point()+
+        geom_boxplot(aes(fill = Condition))+
+        geom_jitter(size = 3)+
         scale_y_continuous(labels = scales::percent_format())+
         facet_grid(cols=vars(PopName))
     print(cur.plot)
@@ -156,9 +152,10 @@ ksink <- lapply(cur.pops,function(cur.pop) {
         filter(Population==cur.pop) %>% 
         mutate(`Percent cells` = Count/Total,
                i = dense_rank(`Percent cells`)) %>% 
-        ggplot(aes(x = i,
+        ggplot(aes(x = Condition,
                    y = `Percent cells`))+
-        geom_point()+
+        geom_boxplot(aes(fill = Condition))+
+        geom_jitter(size = 3)+
         scale_y_continuous(labels = scales::percent_format())+
         facet_grid(cols=vars(Population))
     print(cur.plot)

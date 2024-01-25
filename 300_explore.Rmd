@@ -44,7 +44,7 @@ live.df %>%
                                                "functional")])),
                   ~ do.L(.x,
                          fun=function(x) quantile(x,
-                                                  c(0,0.975))))) %>% 
+                                                  c(0.005,0.995))))) %>% 
     select(all_of(c("name",
                     with(markers,
                          name[type %in% c("phenotypic",
@@ -71,7 +71,11 @@ list(
     tar_target(func.S,
                do_optim_wrap(live.sim,
                              with(markers,
-                                desc[type=="functional"])))
+                                desc[type=="functional"]))),
+    tar_target(fancy.S,
+               do_optim_wrap(live.sim,
+                             c('CD25','FOXP3','CD4',
+                               'TNF','IFNG','CD69','HLADR','IL17A')))
 )
 ```
 
@@ -91,8 +95,34 @@ list(
             left_join(annots,
                       by = "name") %>% 
             do.radviz(.,func.S)
+    }),
+    tar_target(fancy.rv,{
+        live.scaled %>% 
+            left_join(annots,
+                      by = "name") %>% 
+            do.radviz(.,fancy.S)
     })
 )
+```
+
+# PCA
+
+We generate a PCA using scaled values:
+
+```{targets live.pca, tar_simple = TRUE}
+live.scaled %>% 
+           select(-name) %>% 
+    data.frame() %>% 
+    prcomp(x = .)
+```
+then create the corresponding plot:
+
+```{targets live.pca.plot, tar_simple = TRUE}
+as_tibble(live.pca$x) %>% 
+    mutate(name = live.df$name) %>% 
+    left_join(annots,
+              by = "name") %>% 
+    ggplot()
 ```
 
 # Render the `_explore` report

@@ -36,13 +36,15 @@ tar_load(live.mem.plot)
 tar_load(live.hilbert.proj)
 tar_load(pheno.rv)
 tar_load(func.rv)
+tar_load(fancy.rv)
+tar_load(live.pca.plot)
 ```
 
 # Channel Overview
 
 ```{r,fig.width=12,fig.height=9}
 live.df %>%
-    select(all_of(c("name",
+    dplyr::select(all_of(c("name",
                     with(markers,
                          name[type %in% c("phenotypic",
                                           "functional")])))) %>% 
@@ -60,7 +62,7 @@ live.df %>%
                             levels = c(rownames(springs(pheno.rv)),
                                        rownames(springs(func.rv))))) %>% 
     ggplot(aes(x = value))+
-    geom_density(aes(fill = Stimulation))+
+    geom_density(aes(fill = Condition))+
     geom_vline(data = . %>% 
                    group_by(Channel) %>% 
                    reframe(value = quantile(value,c(0.005,0.995))),
@@ -71,11 +73,21 @@ live.df %>%
     xlim(0,NA)
 ```
 
-# MEM results
+# MEM results {.tabset}
+
+## Condition
 
 ```{r}
 live.mem.plot+
-    geom_point()+
+    geom_point(aes(color = Condition))+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Individual
+
+```{r}
+live.mem.plot+
+    geom_point(aes(color = Individual))+
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -83,7 +95,10 @@ live.mem.plot+
 
 ```{r}
 live.hilbert.proj+
-    geom_point(aes(size = N))
+    geom_line(aes(group = Individual),
+              color = "grey80")+
+    geom_point(aes(color = Condition,
+                   size = N))
 ```
 
 # Radviz {.tabset}
@@ -92,12 +107,34 @@ live.hilbert.proj+
 
 ```{r}
 plot(pheno.rv)+
-    geom_density2d()
+    geom_density2d(aes(color = Condition))
 ```
 
 ## Functional
 
 ```{r}
 plot(func.rv)+
-    geom_density2d()
+    geom_density2d(aes(color = Condition))
 ```
+
+## Fancy
+
+```{r}
+plot(fancy.rv)+
+    geom_density2d(aes(color = Condition))
+```
+
+# PCA
+
+Just a simple example:
+
+```{r}
+live.pca.plot+
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   aes(x = PC1, 
+                       y = PC3, 
+                       color = Condition))
+```
+

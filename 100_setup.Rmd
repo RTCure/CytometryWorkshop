@@ -50,13 +50,14 @@ We need to define:
 list(tar_target(params_path,
                 file.path("process","workshop","live")),
      tar_target(params_population,
-                NULL),
+                "/Lymphocytes+Monocytes/Single Cells/live/CD3 subset, FSC-A"),
      tar_target(params_ref_markers,
-                NULL),
+                c('CD3','CD14','LIVE')),
      tar_target(params_pheno_markers,
-                NULL),
+                c('gd','CD25','CD45RA','FOXP3','CD8','CD4')),
      tar_target(params_func_markers,
-                NULL)
+                c('IL1B','TNF','IFNG','CCR6','CCR7','PRF1','IL6','IL10','CD137',
+                  'CD69','HLADR','IL17A','GMCSF'))
 )
 ```
 
@@ -66,7 +67,21 @@ Sample annotation can be either parsed from FCS file names (as below) or loaded 
 
 ```{targets annots, tar_simple=TRUE}
 .gs <- load_gs(params_path)
-tibble(name = sampleNames(.gs))
+tibble(name = sampleNames(.gs)) %>% 
+    mutate(Experiment = str_extract(name,"[0-9]{8}"),
+           Individual = str_extract(name,"(Amy|HC)[0-9]{1,}"),
+           Condition = str_extract(name,"(unstim|Iono)_Unmixed"),
+           Condition = factor(Condition,
+                              levels = c("unstim_Unmixed",
+                                         "Iono_Unmixed"),
+                              labels = c("Unstimulated",
+                                         "PMA_Iono")),
+           PatientType = if_else(str_detect(Individual,"HC"),
+                                 "Healthy control",
+                                 "Patient"),
+           PatientType = factor(PatientType,
+                                levels = c("Healthy control",
+                                           "Patient")))
 ```
 
 # Marker annotation

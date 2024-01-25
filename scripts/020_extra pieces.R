@@ -32,3 +32,28 @@ if(length(trans_channels)>0) {
 # 
 # gs_pop_remove(rawSet,
 #               "TNFstim")
+
+
+## ---- Where are the gd T cells in Radviz? ----
+gate_gd <- lapply(rawSet,gh_pop_get_indices,
+                  "/Lymphocytes+Monocytes/Single Cells/live/CD3 subset, FSC-A/gd")
+gate_gd <- unlist(gate_gd)
+
+gate_live <- lapply(rawSet,gh_pop_get_indices,
+                    params_population)
+gate_live <- unlist(gate_live)
+
+sum(gate_live)
+
+live_gate_gd <- gate_gd[gate_live]
+
+plot(pheno.rv)+
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   aes(color = Condition))+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live_gate_gd) %>% 
+                       dplyr::filter(Population),
+                   color = "grey30")+
+    facet_grid(cols = vars(Condition))
