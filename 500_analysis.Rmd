@@ -38,19 +38,27 @@ source("scripts/900_functions.R")
 
 We run differential analysis using a **G**eneralized **L**inear **M**ixed **M**odel framework with a negative binomial distribution to identify groups of cells that are significantly enriched or depleted in the experiment.
 
-First we define the model and contrasts we are interested in:
+To run statistical modeling we need to define:
+  - The smallest (log~2~) fold change we will consider significant (default: 1, or 2-fold fold change)
+  - The limit of significance after multiple testing correction (default: 5%)
+  - the model used to assess the effect of experimental parameters on population size; the `offset` term defines how changes in population size will be estimated, relative to sample (the default) or relative to the parent population
+  - The contrasts that correspond to specific scientific questions
+
+The pipeline will automatically correct for multiple testing at the contrast level (`tukey` method) and at the population level (`fdr` method).
 
 ```{targets params-analysis}
 list(
-    tar_target(model.total,
-               Count ~ Stimulation + (1|Individual) + offset(logTotal)),
-    tar_target(live.contrasts,{
-        list("pos to neg" = c(-1,1))
     tar_target(params_fold_lim,1),
     tar_target(params_pval_lim,0.05),
+    tar_target(live_model_total,
+               NULL # Count ~ Stimulation + (1|Individual) + offset(logTotal)
+               ),
+    tar_target(params_live_contrasts,{
+        NULL # list("pos to neg" = c(-1,1))
     }),
-    tar_target(model.total.specs, {
-        .specs <- labels(terms(model.total))
+    # the following target should not be edited
+    tar_target(live_model_specs, {
+        .specs <- labels(terms(live_model_total))
         .specs <- .specs[-c(grep("\\|", .specs), grep("\\:", .specs))]
         as.formula(paste("~",
                          paste(.specs,
@@ -58,8 +66,6 @@ list(
     })
 )
 ```
-
-The `offset` term in the model define which reference the population will be compared to.
 
 ## Population (manual gates)
 
@@ -88,13 +94,13 @@ We keep both the Parent size and the Total size so that analysis can be run rela
 pops.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(model.total,
+                       ~ glmer.nb(live_model_total,
                                   data=.,
                                   control = glmerControl(optCtrl = list(maxfun = 25000)))),
            estimate = map2(model,
                            data,
                            ~ emmeans(.x,
-                                     specs = model.total.specs,
+                                     specs = live_model_specs,
                                      data = .y)),
            `N cells` = map_dbl(data,~sum(.$Count)),
            `Percent cells` = 100*`N cells`/sum(`N cells`))
@@ -105,14 +111,14 @@ Next we extract the contrasts:
 ```{targets live.pop.contrasts, tar_simple=TRUE}
 live.pop.models %>% 
     mutate(contrast = map(estimate,~ contrast(.,
-                                              live.contrasts,
+                                              params_live_contrasts,
                                               adjust = "tukey"))) %>% 
     select(Population, contrast, 
            `Percent cells`, `N cells`) %>% 
     mutate(contrast = map(contrast,~ as_tibble(.))) %>% 
     unnest(contrast) %>% 
     mutate(contrast = factor(contrast,
-                             levels = names(live.contrasts)),
+                             levels = names(params_live_contrasts)),
            p.adjustFDR = p.adjust(p.value,
                                   method = "fdr"),
            log.p.value = -log10(p.adjustFDR))
@@ -160,13 +166,13 @@ Only the Total size makes sense here, since metaclusters are not nested. In the 
 metas.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(model.total,
+                       ~ glmer.nb(live_model_total,
                                   data=.,
                                   control = glmerControl(optCtrl = list(maxfun = 25000)))),
            estimate = map2(model,
                            data,
                            ~ emmeans(.x,
-                                     specs = model.total.specs,
+                                     specs = live_model_specs,
                                      data = .y)),
            `N cells` = map_dbl(data,~sum(.$Count)),
            `Percent cells` = 100*`N cells`/sum(`N cells`))
@@ -177,14 +183,14 @@ Next we extract the contrasts:
 ```{targets live.meta.contrasts, tar_simple=TRUE}
 live.meta.models %>% 
     mutate(contrast = map(estimate,~ contrast(.,
-                                              live.contrasts,
+                                              params_live_contrasts,
                                               adjust = "tukey"))) %>% 
     select(Population, contrast, 
            `Percent cells`, `N cells`) %>% 
     mutate(contrast = map(contrast,~ as_tibble(.))) %>% 
     unnest(contrast) %>% 
     mutate(contrast = factor(contrast,
-                             levels = names(live.contrasts)),
+                             levels = names(params_live_contrasts)),
            p.adjustFDR = p.adjust(p.value,
                                   method = "fdr"),
            log.p.value = -log10(p.adjustFDR))
