@@ -13,7 +13,7 @@ output:
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-```{r}
+```{r libraries}
 library(targets)
 # tar_unscript() # this line resets the whole pipeline!
 ```
@@ -22,7 +22,7 @@ library(targets)
 
 We first define some global options/functions common to all targets.
 
-```{targets example-globals, tar_globals = TRUE}
+```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
 tar_option_set(packages = c(c("MASS","cluster",
                               "flowWorkspace","flowCore",
@@ -124,19 +124,19 @@ tar_make()
 
 ## Sample annotations
 
-```{r}
+```{r view-annots}
 tar_read(annots)
 ```
 
 ## Marker annotations
 
-```{r}
+```{r view-markers}
 tar_read(markers)
 ```
 
 ## Channel Overview
 
-```{r,fig.width=12,fig.height=9}
+```{r view-channels,fig.width=12,fig.height=9}
 library(tidyverse)
 tar_read(live.df) %>%
     dplyr::select(all_of(c("name",

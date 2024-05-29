@@ -13,7 +13,7 @@ output:
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-```{r}
+```{r libraries}
 library(targets)
 ```
 
@@ -21,7 +21,7 @@ library(targets)
 
 We first define some global options/functions common to all targets.
 
-```{targets example-globals, tar_globals = TRUE}
+```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
 tar_option_set(packages = c(c("MASS","cluster",
                               "flowWorkspace","flowCore",
