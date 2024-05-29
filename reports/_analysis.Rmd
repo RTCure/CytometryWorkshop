@@ -54,8 +54,6 @@ live.pop.volcano
 
 ```{r}
 live.pop.contrasts %>% 
-    filter(abs(estimate)>1,
-           p.adjustFDR<0.05) %>% 
     filter(abs(estimate)>params_fold_lim,
            p.adjustFDR<params_pval_lim) %>% 
     mutate(PopName = str_replace(Population,
@@ -72,9 +70,6 @@ live.pop.contrasts %>%
 
 ```{r, results='asis'}
 cur.pops <- live.pop.contrasts %>% 
-    filter(abs(estimate)>1,
-           p.adjustFDR<0.05) %>% 
-    distinct(Population,)
     filter(abs(estimate)>params_fold_lim,
            p.adjustFDR<params_pval_lim) %>% 
     distinct(Population)
@@ -123,12 +118,12 @@ live.meta.volcano
 
 ```{r}
 live.meta.contrasts %>% 
-    filter(abs(estimate)>1,
-           p.adjustFDR<0.05) %>% 
     select(Population,
            contrast,
            estimate,
            p.adjustFDR) %>% 
+    filter(abs(estimate)>params_fold_lim,
+           p.adjustFDR<params_pval_lim) %>% 
     arrange(Population, contrast)
 ```
 
@@ -136,8 +131,8 @@ live.meta.contrasts %>%
 
 ```{r, results='asis'}
 cur.pops <- live.meta.contrasts %>% 
-    filter(abs(estimate)>1,
-           p.adjustFDR<0.05) %>% 
+    filter(abs(estimate)>params_fold_lim,
+           p.adjustFDR<params_pval_lim) %>% 
     distinct(Population,)
 cur.pops <- cur.pops$Population
 
