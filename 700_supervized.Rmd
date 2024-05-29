@@ -1,0 +1,127 @@
+---
+title: "Cytometry Workflow 7 - Supervized Learning"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r libraries}
+library(targets)
+library(tarchetypes)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM",
+                              "yaml","tidyverse")))
+source("scripts/900_functions.R")
+```
+
+# Freeviz
+
+To optimize a [Freeviz]() we need the following parameters:
+
+ - the metacluster of interest 
+ - the channels to optimize
+ - the variable(s) to optimize for
+ - the limit on weights for the channels (visualization only)
+
+```{targets params-freeviz}
+list(
+    tar_target(params_fv_metas,5),
+    tar_target(params_fv_channels,{
+        with(markers,
+             desc[type %in% c("phenotypic","functional")])
+    }),
+    tar_target(params_fv_conditions,
+               c("Condition","PatientType")),
+    tar_target(anchor.lim,0.3)
+)
+```
+
+We can now optimize the channels:
+
+```{targets live.fv.optim, tar_simple=TRUE, tar_interactive=FALSE}
+.mat <- live.scaled %>%
+    left_join(annots,
+              by = "name") %>%
+    mutate(Population = live.fsom.metaclusters) %>% 
+    unite("conditions",
+          all_of(params_fv_conditions)) %>% 
+    filter(Population %in% params_fv_metas)
+
+.weights <- .mat %>% 
+    count(conditions,
+          name = "weight")
+
+if(nrow(.mat)>10000) {
+    .n <- min(10000/nrow(.weights),
+              .weights$weight)
+    .mat <- .mat %>% 
+        slice_sample(n=.n,
+                     by = conditions)
+}
+
+.mat %>% 
+    select(all_of(params_fv_channels)) %>% 
+    as.matrix() %>% 
+    do.optimFreeviz(.,
+                    classes = .mat$conditions)
+```
+
+For interpretation we will compute the channel weights:
+
+```{targets freeviz-weights}
+tar_target(live.fv.weights,{
+    tibble(Channel = rownames(live.fv.optim),
+           weight = rowSums(live.fv.optim^2)^0.5) %>% 
+        mutate(i = dense_rank(weight))
+})
+```
+
+And run a Freeviz projection:
+
+```{targets freeviz-proj}
+tar_target(live.fv,{
+    live.scaled %>%
+        left_join(annots,
+                  by = "name") %>%
+        mutate(Population = live.fsom.metaclusters) %>% 
+        filter(Population %in% params_fv_metas) %>% 
+        do.radviz(.,
+                  live.fv.optim)
+})
+```
+
+# Render the `_supervized` report
+
+At this stage we define an `_supervized` report that will become part of the pipeline and will be automatically updated as required, to visualize the results of the `Freeviz` training:
+
+```{targets supervized-report}
+tarchetypes::tar_render(supervized,
+                        "reports/_supervized.Rmd",
+                        params = list(store = tar_config_get("store")))
+```
+
+# Run the pipeline
+
+```{r run}
+tar_make()
+```

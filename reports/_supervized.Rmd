@@ -1,0 +1,67 @@
+---
+title: "Visualizing Supervized Analysis"
+params:
+  store: !r file.path("..","_targets")
+output:
+  html_notebook:
+    df_print: paged
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+# loading the packages
+
+```{r setup}
+library(targets)
+
+library(knitr)
+
+library(tidyverse)
+
+library(Radviz)
+
+theme_set(theme_light(base_size = 16))
+tar_config_set(store = params$store)
+```
+
+# loading the data
+
+```{r data}
+tar_load(anchor.lim)
+tar_load(params_fv_conditions)
+tar_load(live.fv.weights)
+tar_load(live.fv)
+```
+
+# Visualizing the weights
+
+The channel weights correspond to the relevance of a particular channel to the separation between training categories:
+
+```{r}
+live.fv.weights %>% 
+    ggplot(aes(x = i,
+               y = weight))+
+    geom_text(aes(label = Channel))+
+    geom_hline(yintercept = anchor.lim,
+               col = 2,
+               lty = 2)
+```
+
+The red dotted line corresponds to the `anchor.lim` parameter and will be used to filter out channels that don't contribute to the separation between classes.
+
+# Visualizing the `Freeviz` results
+
+```{r}
+plot(
+    rescalePlot(
+        anchor.filter(live.fv,anchor.lim)))+
+    geom_density2d(data = .  %>% 
+                       unite("conditions",
+                             all_of(params_fv_conditions)) %>% 
+                       slice_sample(prop = 0.1,
+                                    by = conditions),
+                   aes(color = conditions))
+```
+
