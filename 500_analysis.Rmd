@@ -77,7 +77,7 @@ recompute(.gs) # just in case
 .counts <- gs_pop_get_count_fast(.gs)
 .total <- .counts %>% 
     filter(Population==params_population) %>% 
-    select(name,Total = Count)
+    dplyr::select(name,Total = Count)
 annots %>%
     left_join(.counts,
               by = "name") %>%

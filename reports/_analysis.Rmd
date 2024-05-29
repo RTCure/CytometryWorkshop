@@ -59,10 +59,10 @@ live.pop.contrasts %>%
     mutate(PopName = str_replace(Population,
                                  fixed(params_population),
                                  "")) %>% 
-    select(Population = PopName,
-           contrast,
-           estimate,
-           p.adjustFDR) %>% 
+    dplyr::select(Population = PopName,
+                  contrast,
+                  estimate,
+                  p.adjustFDR) %>% 
     arrange(Population, contrast)
 ```
 
@@ -84,10 +84,10 @@ ksink <- lapply(cur.pops,function(cur.pop) {
         mutate(PopName = str_replace(Population,
                                      fixed(params_population),
                                      "")) %>% 
-        select(Population = PopName,
-               contrast,
-               estimate,
-               p.adjustFDR) %>% 
+        dplyr::select(Population = PopName,
+                      contrast,
+                      estimate,
+                      p.adjustFDR) %>% 
         arrange(Population, contrast)
     print(kable(cur.table))
     cat("\n\n")
@@ -118,12 +118,12 @@ live.meta.volcano
 
 ```{r}
 live.meta.contrasts %>% 
-    select(Population,
-           contrast,
-           estimate,
-           p.adjustFDR) %>% 
     filter(abs(estimate)>params_fold_lim,
            p.adjustFDR<params_pval_lim) %>% 
+    dplyr::select(Population,
+                  contrast,
+                  estimate,
+                  p.adjustFDR) %>% 
     arrange(Population, contrast)
 ```
 
@@ -140,10 +140,10 @@ ksink <- lapply(cur.pops,function(cur.pop) {
     cat("#### ",cur.pop,"\n\n")
     cur.table <- live.meta.contrasts %>% 
         filter(Population==cur.pop) %>% 
-        select(Population,
-               contrast,
-               estimate,
-               p.adjustFDR) %>% 
+        dplyr::select(Population,
+                      contrast,
+                      estimate,
+                      p.adjustFDR) %>% 
         arrange(Population, contrast)
     print(kable(cur.table))
     cat("\n\n")
