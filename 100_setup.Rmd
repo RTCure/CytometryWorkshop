@@ -44,7 +44,7 @@ We need to define:
      - *reference* markers that are part of the gating scheme and will be negative or positive for all cells
      - *phenotypic* markers that are differentiating populations within the population of interest (bimodal)
      - *functional* markers that are indicative of the status of the cells (continuous)
-     - all other markers are considered *CyTOF*
+     - all other markers are considered *other*
 
 ```{targets params}
 list(tar_target(params_path,
