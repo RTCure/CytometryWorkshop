@@ -48,15 +48,13 @@ The pipeline will automatically correct for multiple testing at the contrast lev
 
 ```{targets params-analysis}
 list(
-    tar_target(params_fold_lim,1),
-    tar_target(params_pval_lim,0.05),
+    tar_target(params_fold_lim,0.8),
+    tar_target(params_pval_lim,0.01),
     tar_target(live_model_total,
-               NULL # Count ~ Stimulation + (1|Individual) + offset(logTotal)
-               ),
+               Count ~ Condition + (1|Individual) + offset(logTotal)),
     tar_target(params_live_contrasts,{
-        NULL # list("pos to neg" = c(-1,1))
+        list("PMA_Iono to Unstim" = c(-1,1))
     }),
-    # the following target should not be edited
     tar_target(live_model_specs, {
         .specs <- labels(terms(live_model_total))
         .specs <- .specs[-c(grep("\\|", .specs), grep("\\:", .specs))]

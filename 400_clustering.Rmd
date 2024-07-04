@@ -43,8 +43,8 @@ On top of manual gating we use `FlowSOM` ([Van Gassen 2015](https://doi.org/10.1
  
 ```{targets params-fsom}
 list(
-    tar_target(params_fsom_grid,10),
-    tar_target(params_fsom_nclus,30),
+    tar_target(params_fsom_grid,6),
+    tar_target(params_fsom_nclus,7),
     tar_target(params_fsom_channels,{
         with(markers,
              name[type %in% c("phenotypic")])
@@ -55,9 +55,13 @@ list(
 Then we run the clustering algorithm:
 
 ```{targets live.fsom, tar_simple=TRUE}
-.gs <- load_gs(params_path)
-.fs <- gs_pop_get_data(.gs,
-                        params_population)
+.fs <- live.df %>%
+    mutate(across(all_of(params_fsom_channels),
+                  ~ do_shave(.x,
+                             fun=function(x) quantile(x,
+                                                      c(0.005,0.995))))) %>% 
+    dplyr::select(all_of(params_fsom_channels)) %>% 
+    as.matrix(.)
 
 FlowSOM(.fs,
         compensate = FALSE,
