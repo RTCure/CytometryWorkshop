@@ -161,6 +161,5 @@ tar_read(live.df) %>%
                aes(xintercept = value),
                col = 2)+
     facet_wrap(~Channel,
-               scales = "free_y")+
-    xlim(0,NA)
+               scales = "free_y")
 ```
