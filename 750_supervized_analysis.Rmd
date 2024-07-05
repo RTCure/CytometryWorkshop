@@ -47,20 +47,11 @@ To run this analysis we need the following parameters:
 
 ```{targets params-polyfunc}
 list(
-    tar_target(params_pf_nbins,8),
+    tar_target(params_pf_nbins,NULL),
     tar_target(live_pf_model_total,
-               Count ~ Condition*PatientType + (1|Individual) + offset(logTotal)),
+               NULL # Count ~ Condition*PatientType + (1|Individual) + offset(logTotal)),
     tar_target(params_live_pf_contrasts,{
-        .cont <- rep(0,4)
-        
-        .cont1 <- .cont
-        .cont1[c(1,2)] <- c(-1,1) # (S-U)H
-        
-        .cont2 <- .cont
-        .cont2[c(3,4)] <- c(-1,1) # (S-U)P
-        
-        list("S-U" = .cont1+.cont2,
-             "(P-H)(S-U)" = .cont2-.cont1)
+        NULL
     }),
     tar_target(live_pf_model_specs, {
         .specs <- labels(terms(live_pf_model_total))
