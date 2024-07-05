@@ -1,0 +1,84 @@
+---
+title: "Visualizing Supervized Analysis"
+params:
+  store: !r file.path("..","_targets")
+output:
+  html_notebook:
+    df_print: paged
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+# loading the packages
+
+```{r setup}
+library(targets)
+
+library(knitr)
+
+library(tidyverse)
+
+library(Radviz)
+
+theme_set(theme_light(base_size = 16))
+tar_config_set(store = params$store)
+```
+
+# loading the data
+
+```{r data}
+tar_load(anchor.lim)
+tar_load(params_fv_metas)
+tar_load(params_fv_conditions)
+tar_load(live.fv.weights)
+tar_load(live.fvs)
+```
+
+To simplify plotting we preprocess the `Freeviz` plots:
+
+```{r freeviz-preprocess}
+live.fvs <- lapply(live.fvs,anchor.filter,anchor.lim)
+live.fvs <- lapply(live.fvs,function(fv) suppressWarnings(rescalePlot(fv)))
+```
+
+# Visualizing the weights {.tabset}
+
+The channel weights correspond to the relevance of a particular channel to the separation between training categories.
+
+The red dotted line corresponds to the `anchor.lim` parameter and will be used to filter out channels that don't contribute to the separation between classes.
+
+```{r weights, fig.width = 6, fig.height = 6, results="asis"}
+ksink <- lapply(seq(length(params_fv_metas)), function(imetas) {
+    cat("## Metacluster #",params_fv_metas[imetas],"\n\n")
+    p <- live.fv.weights[[imetas]] %>% 
+        ggplot(aes(x = i,
+                   y = weight))+
+        geom_text(aes(label = Channel))+
+        geom_hline(yintercept = anchor.lim,
+                   col = 2,
+                   lty = 2)
+    print(p)
+    cat("\n\n")
+})
+```
+
+# Visualizing the `Freeviz` results {.tabset}
+
+```{r freevizs, fig.width = 8, fig.height = 6, results="asis"}
+ksink <- lapply(seq(length(params_fv_metas)), function(imetas) {
+    cat("## Metacluster #",params_fv_metas[imetas],"\n\n")
+    p <- plot(live.fvs[[imetas]])+
+        geom_density2d(data = .  %>% 
+                           unite("conditions",
+                                 all_of(params_fv_conditions)) %>% 
+                           slice_sample(n = 5000,
+                                        by = conditions,
+                                        replace = TRUE),
+                       aes(color = conditions))
+    print(p)
+    cat("\n\n")
+})
+```
+
