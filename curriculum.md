@@ -14,6 +14,10 @@
 
 [`ggplot2` reference](https://ggplot2.tidyverse.org/)
 
+# openCyto
+
+[Bioconductor::openCyto](https://www.bioconductor.org/packages/release/bioc/html/openCyto.html)
+
 # Generalized Linear Mixed Models
 
 [INTRODUCTION TO LINEAR MIXED MODELS](https://ourcodingclub.github.io/tutorials/mixed-models/)
