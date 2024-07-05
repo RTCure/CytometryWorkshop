@@ -1,0 +1,138 @@
+---
+title: "Visualizing Supervized Analysis"
+params:
+  store: !r file.path("..","_targets")
+output:
+  html_notebook:
+    df_print: paged
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+# loading the packages
+
+```{r setup}
+library(targets)
+
+library(knitr)
+
+library(tidyverse)
+
+library(Radviz)
+
+theme_set(theme_light(base_size = 16))
+tar_config_set(store = params$store)
+```
+
+# loading the data
+
+```{r data}
+tar_load(anchor.lim)
+tar_load(params_fold_lim)
+tar_load(params_pval_lim)
+tar_load(params_fv_metas)
+tar_load(params_fv_conditions)
+tar_load(live.fvs)
+tar_load(live.pf.soms)
+tar_load(live.pf.contrasts)
+tar_load(live.pf.volcano)
+```
+
+To simplify plotting we preprocess the `Freeviz` plots:
+
+```{r freeviz-preprocess}
+live.fvs <- lapply(live.fvs,anchor.filter,anchor.lim)
+live.fvs <- lapply(live.fvs,function(fv) suppressWarnings(rescalePlot(fv)))
+```
+
+# Visualizing the clusters {.tabset}
+
+We start by visualizing the clusters in `Freeviz` space:
+
+```{r freeviz-clusters, fig.width = 8, fig.height = 6, results="asis"}
+ksink <- lapply(seq(length(params_fv_metas)), function(imetas) {
+    cat("## Metacluster #",params_fv_metas[imetas],"\n\n")
+    p <- plot(live.fvs[[imetas]])+
+        geom_density2d(data = .  %>% 
+                           unite("conditions",
+                                 all_of(params_fv_conditions)) %>% 
+                           slice_sample(n = 5000,
+                                        by = conditions,
+                                        replace = TRUE),
+                       aes(color = conditions))+
+        geom_point(data = . %>% 
+                       mutate(fvCluster = live.pf.soms[[imetas]]) %>% 
+                       group_by(fvCluster) %>%
+                       summarize(rx = median(rx),
+                                 ry = median(ry),
+                                 N = length(fvCluster),
+                                 .groups = "drop"),
+                   aes(size = N),
+                   shape = 21)+
+        scale_size(range = c(2,8))+
+        guides(size = "none")
+    print(p)
+    cat("\n\n")
+})
+```
+
+# Visualizing the Polyfunctionality results
+
+## Volcano
+
+The results of the polyfunctionality analysis are visualized first as a volcano plot:
+
+```{r polyfunc-volcano}
+live.pf.volcano
+```
+
+## Freeviz {.tabset}
+
+```{r polyfunc-results, results="asis"}
+ksink <- lapply(seq(length(params_fv_metas)), function(imetas) {
+    cat("### Metacluster #",params_fv_metas[imetas],"\n\n")
+    lapply(levels(live.pf.contrasts[[imetas]]$contrast),function(.cont) {
+        cat("Contrast",.cont,"\n\n")
+        .lims <- max(abs(range(live.pf.contrasts[[imetas]]$estimate)))
+        p <- plot(live.fvs[[imetas]])+
+            geom_density2d(data = .  %>% 
+                               unite("conditions",
+                                     all_of(params_fv_conditions)) %>% 
+                               slice_sample(n = 5000,
+                                            by = conditions,
+                                            replace = TRUE),
+                           aes(color = conditions))+
+            geom_point(data = .  %>% 
+                           mutate(fvCluster = live.pf.soms[[imetas]]) %>% 
+                           group_by(fvCluster) %>%
+                           summarize(rx = median(rx),
+                                     ry = median(ry),
+                                     N = length(fvCluster),
+                                     .groups = "drop") %>% 
+                           inner_join(live.pf.contrasts[[imetas]] %>% 
+                                          filter(contrast==.cont),
+                                      by = "fvCluster") %>% 
+                           mutate(estimate = if_else(abs(estimate)>params_fold_lim & 
+                                                         p.adjustFDR<params_pval_lim,
+                                                     estimate,
+                                                     NA)),
+                       aes(size = N,
+                           fill = estimate),
+                       shape = 21)+
+            scale_size(range = c(2,8))+
+            scale_fill_gradient2(limits = c(-.lims,
+                                            .lims),
+                                 low = blues9[7],
+                                 mid = "grey90",
+                                 high = "orangered2",
+                                 na.value = NA)+
+            guides(size = "none")
+        
+        print(p)
+        cat("\n\n")
+    })
+})
+```
+

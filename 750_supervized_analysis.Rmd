@@ -1,0 +1,270 @@
+---
+title: "Cytometry Workflow 7.5 - Supervized Differential Analysis"
+output: 
+    html_document:
+        df_print: paged
+        code_folding: show
+        toc: yes
+        toc_float: yes
+        toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r libraries}
+library(targets)
+library(tarchetypes)
+```
+
+# Globals
+
+We first define some global options/functions common to all targets.
+
+```{targets globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(packages = c(c("MASS","cluster",
+                              "flowWorkspace","flowCore",
+                              "hilbertSimilarity","entropy",
+                              "Radviz","cytofan",
+                              "lme4","emmeans",
+                              "FlowSOM",
+                              "yaml","tidyverse")))
+source("scripts/900_functions.R")
+```
+
+# Set-up
+
+Distance between points in Freeviz is guaranteed to be maximal between `params_fv_conditions`, and is also a weighted correlation coefficient that can be used to cluster cells. Those clusters can then be used as a basis for differential analysis.
+
+To run this analysis we need the following parameters:
+
+ - the grid size for clustering
+ - the model used to assess the effect of experimental parameters on population size; the `offset` term defines how changes in population size will be estimated, relative to sample (the default) or relative to the parent population
+  - The contrasts that correspond to specific scientific questions
+  - the grid definition for `kohonen`
+
+```{targets params-polyfunc}
+list(
+    tar_target(params_pf_nbins,8),
+    tar_target(live_pf_model_total,
+               Count ~ Condition*PatientType + (1|Individual) + offset(logTotal)),
+    tar_target(params_live_pf_contrasts,{
+        .cont <- rep(0,4)
+        
+        .cont1 <- .cont
+        .cont1[c(1,2)] <- c(-1,1) # (S-U)H
+        
+        .cont2 <- .cont
+        .cont2[c(3,4)] <- c(-1,1) # (S-U)P
+        
+        list("S-U" = .cont1+.cont2,
+             "(P-H)(S-U)" = .cont2-.cont1)
+    }),
+    tar_target(live_pf_model_specs, {
+        .specs <- labels(terms(live_pf_model_total))
+        .specs <- .specs[-c(grep("\\|", .specs), grep("\\:", .specs))]
+        as.formula(paste("~",
+                         paste(.specs,
+                               collapse = "+")))
+    }),
+    tar_target(params_pf_grid, {
+        library(kohonen)
+        somgrid(xdim = params_pf_nbins,
+                ydim = params_pf_nbins,
+                topo = 'hexagonal',
+                toroidal = T)
+    })
+)
+```
+
+# Clustering
+
+## Downsampling
+
+First we will down-sample the projection space to avoid over clustering of denser parts of the projection. 
+
+```{targets polyfunc-downsamples, tar_interactive=FALSE}
+list(
+    tar_target(live.pf.cuts, {
+    .cuts <- make.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
+                      n=floor(1.5*params_pf_nbins)+1)
+    .cuts <- do.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
+                    .cuts,
+                    type = "fixed")
+  },
+  pattern = map(params_fv_metas, live.fvs),
+  iteration = "list"),
+  tar_target(live.pf.hcs, {
+    .hcs <- do.hilbert(live.pf.cuts,
+                       horder = floor(1.5*params_pf_nbins))
+    factor(.hcs)
+  },
+  pattern = map(params_fv_metas, live.pf.cuts),
+  iteration = "list")
+)
+```
+
+## SOM clusters
+
+Next we can build `SOM` models that will capture the main states in the Freeviz analysis:
+
+```{targets polyfunc-som-models, tar_interactive = FALSE}
+tar_target(live.pf.som.models, {
+    library(kohonen)
+    sbs <- lapply(levels(live.pf.hcs),function(j) {
+        sample(which(live.pf.hcs==j),100,replace = TRUE)
+    })
+    sbs <- unlist(sbs)
+    som(as.matrix(live.fvs$proj$data[sbs,c("rx","ry")]),
+        grid = params_pf_grid)
+},
+pattern = map(params_fv_metas, live.fvs, live.pf.hcs),
+iteration = "list")
+```
+
+Next we use these `SOM` models to predict clusters for all projected cells:
+
+```{targets polyfunc-soms, tar_interactive = FALSE}
+tar_target(live.pf.soms, {
+    library(kohonen)
+    .soms <- predict(object = live.pf.som.models,
+                     newdata = as.matrix(live.fvs$proj$data[,c("rx","ry")]))
+    factor(.soms$unit.classif)
+},
+pattern = map(params_fv_metas, live.fvs, live.pf.som.models),
+iteration = "list")
+```
+
+# Differential analysis
+
+## Counting cells per cluster per `Freeviz`
+
+We first compute the number of cells per cluster per sample for each `Freeviz` projection:
+
+```{targets polyfunc-counts, tar_interactive = FALSE}
+tar_target(live.pf.counts, {
+    .counts <- live.fvs$proj$data %>% 
+        mutate(fvCluster = live.pf.soms) %>% 
+        count(name, fvCluster,
+              name = "Count")
+    
+    .total <- .counts %>% 
+        group_by(name) %>% 
+        summarize(Total = sum(Count))%>% 
+        mutate(logTotal = log(Total))
+    
+    annots %>% 
+        left_join(.counts,
+                  by = "name") %>% 
+        left_join(.total,
+                  by = "name")
+},
+pattern = map(params_fv_metas, live.fvs, live.pf.soms),
+iteration = "list")
+```
+
+To make sure the models can be fitted we will focus on clusters where at least 3 samples are available over each group:
+
+```{targets polyfunc-counts-valid, tar_interactive = FALSE}
+tar_target(live.pf.counts.valid, {
+    live.pf.counts %>% 
+        group_by(pick("fvCluster",labels(terms(live_pf_model_specs)))) %>% 
+        summarize(n = n(),
+                  .groups = "drop") %>% 
+        filter(n>=3) %>% 
+        group_by(fvCluster) %>% 
+        summarize(n = n(),
+                  .groups = "drop") %>% 
+        filter(n==max(n)) %>% 
+        select(fvCluster) %>% 
+        left_join(live.pf.counts,
+                  by = "fvCluster")
+},
+pattern = map(params_fv_metas, live.fvs, live.pf.soms, live.pf.counts),
+iteration = "list")
+```
+
+## Modeling
+
+Next we fit a model to each cluster within each `Freeviz`:
+
+```{targets polyfunc-models, tar_interactive = FALSE}
+tar_target(live.pf.models, {
+    live.pf.counts.valid %>% 
+        nest(data = -fvCluster) %>% 
+        mutate(model = map(data,
+                           ~ glmer.nb(live_pf_model_total,
+                                      data=.,
+                                      control = glmerControl(optCtrl = list(maxfun = 25000)))),
+               estimate = map2(model,
+                               data,
+                               ~ emmeans(.x,
+                                         specs = live_pf_model_specs,
+                                         data = .y)),
+               `N cells` = map_dbl(data,~sum(.$Count)),
+               `Percent cells` = 100*`N cells`/sum(`N cells`))
+},
+pattern = map(params_fv_metas, live.fvs, live.pf.soms, live.pf.counts.valid),
+iteration = "list")
+```
+
+## Contrasts
+
+We can now extract the required contrast(s) from the estimates:
+
+```{targets polyfunc-contrasts, tar_interactive = FALSE}
+tar_target(live.pf.contrasts, {
+    live.pf.models %>% 
+        mutate(contrast = map(estimate,~ contrast(.,
+                                                  params_live_pf_contrasts,
+                                                  adjust = "tukey"))) %>% 
+        select(fvCluster, contrast, 
+               `Percent cells`, `N cells`) %>% 
+        mutate(contrast = map(contrast,~ as_tibble(.))) %>% 
+        unnest(contrast) %>% 
+        mutate(Metacluster = params_fv_metas,
+               contrast = factor(contrast,
+                                 levels = names(params_live_pf_contrasts)),
+               p.adjustFDR = p.adjust(p.value,
+                                      method = "fdr"),
+               log.p.value = -log10(p.adjustFDR))
+},
+pattern = map(params_fv_metas, live.fvs, live.pf.soms, live.pf.models),
+iteration = "list")
+```
+
+And we prepare the volcano plot for results:
+
+```{targets polyfunc-volcano, tar_interactive = FALSE}
+tar_target(live.pf.volcano,{
+    bind_rows(live.pf.contrasts) %>% 
+        ggplot(aes(x = estimate,
+                   y = log.p.value))+
+        geom_label(aes(label = fvCluster))+
+        geom_vline(xintercept = c(-params_fold_lim,
+                                  params_fold_lim),
+                   col = 2, lty = 2)+
+        geom_hline(yintercept = -log10(params_pval_lim),
+                   col = 2, lty = 2)+
+        facet_grid(rows = vars(contrast),
+                   cols = vars(Metacluster))
+})
+```
+
+# Render the `_polyfunc` report
+
+At this stage we define an `_polyfunc` report that will become part of the pipeline and will be automatically updated as required, to visualize the results of the polyfunctionality analysis:
+
+```{targets polyfunc-report, tar_interactive=FALSE}
+tarchetypes::tar_render(polyfunc,
+                        "reports/_polyfunc.Rmd",
+                        params = list(store = tar_config_get("store")))
+```
+
+# Run the pipeline
+
+```{r run}
+tar_make()
+```
