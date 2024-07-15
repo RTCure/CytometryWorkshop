@@ -165,22 +165,18 @@ pattern = map(params_fv_metas, live.fvs, live.pf.soms),
 iteration = "list")
 ```
 
-To make sure the models can be fitted we will focus on clusters where at least 3 samples are available over each group:
+To make sure the models can be fitted we will focus on clusters where all model terms are identified:
 
 ```{targets polyfunc-counts-valid, tar_interactive = FALSE}
 tar_target(live.pf.counts.valid, {
-    live.pf.counts %>% 
-        group_by(pick("fvCluster",labels(terms(live_pf_model_specs)))) %>% 
-        summarize(n = n(),
-                  .groups = "drop") %>% 
-        filter(n>=3) %>% 
-        group_by(fvCluster) %>% 
-        summarize(n = n(),
-                  .groups = "drop") %>% 
-        filter(n==max(n)) %>% 
-        select(fvCluster) %>% 
-        left_join(live.pf.counts,
-                  by = "fvCluster")
+    live.pf.countslive.pf.counts %>% 
+        unite("coefs",
+              one_of(labels(terms(live_pf_model_specs))),
+              remove = FALSE) %>%
+        group_by(fvCluster) %>%
+        mutate(N_coefs = length(unique(coefs))) %>%
+        ungroup() %>%
+        dplyr::filter(N_coefs==max(N_coefs))
 },
 pattern = map(params_fv_metas, live.fvs, live.pf.soms, live.pf.counts),
 iteration = "list")
