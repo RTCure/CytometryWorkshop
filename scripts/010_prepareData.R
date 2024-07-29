@@ -14,7 +14,7 @@ library(ggcyto)
 library(tidyverse)
 
 ## parameters
-input.dir <- file.path("input","KI")
+input.dir <- file.path("input","HELIOS share")
 process.dir <- "process"
 output.dir <- "output"
 
@@ -34,7 +34,7 @@ if(!file.exists(file.path(process.dir,exp.id,"live"))) {
 
 ## ---- load data ----
 
-params_flow_filename <- file.path("5hPMA_Iono","30-Oct-2023MGS.wsp")
+params_flow_filename <- file.path("30-May-2024.wsp")
 
 fj <- CytoML::open_flowjo_xml(file.path(input.dir,params_flow_filename))
 rawSet <- flowjo_to_gatingset(fj,
@@ -50,6 +50,15 @@ plot(rawSet)
 as_tibble(pData(parameters(gs_cyto_data(rawSet)[[1]])),
           rownames = "id") %>% 
     View()
+
+as_tibble(pData(parameters(gs_cyto_data(rawSet)[[1]])),
+          rownames = "id") %>% 
+    mutate(desc_orig = desc,
+           desc = str_split_fixed(desc,"_",2)[,2]) %>% 
+    dplyr::filter(desc!="") %>% 
+    .[,"desc",drop=TRUE] %>% 
+    paste0("'",.,"'",collapse=",")
+
 
 ## ---- review transformations ----
 
@@ -76,6 +85,11 @@ if(length(trans_channels)>0) {
 pData(rawSet) %>% 
     View()
 
+as_tibble(pData(rawSet),
+          rownames = "id") %>% 
+    rename(FCSname = name,
+           name = id)
+
 ## ---- review gates & channels ----
 
 gs_get_pop_paths(rawSet)
@@ -83,19 +97,29 @@ gs_get_pop_paths(rawSet)
 autoplot(rawSet[[1]],
          gs_get_pop_paths(rawSet)[-1])
 
-autoplot(rawSet[[1]],
-         str_subset(gs_get_pop_paths(rawSet),"CD8"))+
+autoplot(rawSet,
+         # str_subset(gs_get_pop_paths(rawSet),"CD8")
+         "Tcells/CD8")+
     geom_stats(type = c("gate_name","percent"))
 
 ggcyto(rawSet[1],
        aes(x = CD3),
-       subset = "live")+
+       subset = "CD19neg")+
     geom_density()
 
 ggcyto(rawSet[c(1,2)],
        aes(x = CD4,
-           y = gd),
-       subset = "CD3 subset, FSC-A")+
+           y = CD8a),
+       subset = "T cells")+
+    geom_hex()+
+    geom_gate("Tcells/CD8")+
+    geom_gate("Tcells/CD4")+
+    geom_stats(type = c("gate_name","percent"))
+
+ggcyto(rawSet[c(1,2)],
+       aes(x = CD4,
+           y = CD8a),
+       subset = "T cells")+
     geom_hex()+
     geom_gate("CD4")+
     geom_stats("CD4",

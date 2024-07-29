@@ -45,13 +45,13 @@ To optimize a [Freeviz]() we need the following parameters:
 
 ```{targets params-freeviz}
 list(
-    tar_target(params_fv_metas,NULL),
+    tar_target(params_fv_metas,c(2,12)),
     tar_target(params_fv_channels,{
         with(markers,
              desc[type %in% c("phenotypic","functional")])
     }),
     tar_target(params_fv_conditions,
-               NULL),
+               c("PatientType","Timepoint")),
     tar_target(anchor.lim,0.3)
 )
 ```

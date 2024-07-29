@@ -34,6 +34,7 @@ tar_load(annots)
 tar_load(live.df)
 tar_load(live.mem.plot)
 tar_load(live.hilbert.proj)
+tar_load(live.hilbert.dist)
 tar_load(pheno.rv)
 tar_load(func.rv)
 ```
@@ -42,7 +43,7 @@ tar_load(func.rv)
 
 ```{r,fig.width=12,fig.height=9}
 live.df %>%
-    select(all_of(c("name",
+    dplyr::select(all_of(c("name",
                     with(markers,
                          name[type %in% c("phenotypic",
                                           "functional")])))) %>% 
@@ -63,7 +64,7 @@ live.df %>%
     geom_density()+
     geom_vline(data = . %>% 
                    group_by(Channel) %>% 
-                   reframe(value = quantile(value,c(0,0.975))),
+                   reframe(value = quantile(value,c(0,0.99))),
                aes(xintercept = value),
                col = 2)+
     facet_wrap(~Channel,
@@ -71,33 +72,111 @@ live.df %>%
     xlim(0,NA)
 ```
 
-# MEM results
+# MEM results {.tabset}
+
+## Batch
 
 ```{r}
 live.mem.plot+
-    geom_point()+
+    geom_point(aes(color = BatchId),
+               size = 3)+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Treatment
+
+```{r}
+live.mem.plot+
+    geom_point(aes(color = Timepoint),
+               size = 3)+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Patient Type
+
+```{r}
+live.mem.plot+
+    geom_point(aes(color = PatientType),
+               size = 3)+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## HD vs Patient at Baseline
+
+```{r}
+live.mem.plot+
+    geom_point(data = . %>% 
+                   filter(Timepoint=="baseline"),
+               aes(color = PatientType),
+               size = 3)+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+live.mem.plot+
+    geom_point(aes(color = PatientType),
+               size = 3)+
+    facet_grid(rows = vars(Timepoint))+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+## Where is Patient #1?
+
+```{r}
+live.mem.plot+
+    geom_point(data = . %>% 
+                   mutate(isPT1 = Individual=="PT1" & 
+                              Timepoint=="treated") %>% 
+                   arrange(isPT1),
+               aes(color = isPT1),
+               size = 3)+
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 # HilbertSimilarity
 
-```{r}
-live.hilbert.proj+
-    geom_point(aes(size = N))
+```{r, fig.height = 12}
+plot(hclust(live.hilbert.dist))
 ```
+
+```{r}
+hc <- hclust(live.hilbert.dist)
+hc$labels <- with(annots,Individual[match(name,hc$labels)])
+plot(hc)
+```
+
 
 # Radviz {.tabset}
 
 ## Phenotypic
 
-```{r}
+```{r, fig.width=9}
 plot(pheno.rv)+
-    geom_density2d()
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   aes(color = Timepoint))+
+    facet_grid(cols = vars(PatientType))
+```
+
+## Functional
+
+```{r, fig.width=9}
+plot(func.rv)+
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1),
+                   aes(color = Timepoint))+
+    facet_grid(cols = vars(PatientType))
 ```
 
 ## Functional
 
 ```{r}
 plot(func.rv)+
-    geom_density2d()
+    geom_density2d(data = . %>% 
+                       group_by(name) %>% 
+                       sample_frac(0.1) %>% 
+                       unite("Condition",
+                             PatientType,Timepoint),
+                   aes(color = Condition))
 ```

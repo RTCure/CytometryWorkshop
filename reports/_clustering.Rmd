@@ -45,7 +45,7 @@ We start by computing the median channel intensity per metacluster:
 ```{r}
 live.metas.channels <- live.df %>% 
     mutate(Population = live.fsom.metaclusters) %>% 
-    select(all_of(c("Population",params_fsom_channels))) %>% 
+    dplyr::select(all_of(c("Population",params_fsom_channels))) %>% 
     rename_with(~ with(markers,
                        desc[match(.x,name)]),
                 !Population) %>% 
@@ -56,12 +56,26 @@ live.metas.channels <- live.df %>%
               .groups = "drop_last")
 ```
 
+```{r}
+.mat <- live.metas.channels %>% 
+    spread(Channel,value)
+.ids <- .mat[,1,drop=TRUE]
+.mat <- as.matrix(.mat[,-1])
+rownames(.mat) <- .ids
+.hc.rows <- hclust(dist(.mat))
+.hc.cols <- hclust(dist(t(.mat)))
+```
+
 Let's visualize metaclusters as heatmaps:
 
 ## Median intensity
 
 ```{r, fig.width = 8}
-live.metas.channels %>% 
+live.metas.channels  %>% 
+    mutate(Population = factor(Population,
+                               levels = with(.hc.rows,labels[order])),
+           Channel = factor(Channel,
+                            levels = with(.hc.cols,labels[order]))) %>% 
     ggplot(aes(x = Channel,
                y = Population))+
     geom_tile(aes(fill = value))+
@@ -73,7 +87,11 @@ live.metas.channels %>%
 ## Median intensity (normalized per channel)
 
 ```{r, fig.width = 8}
-live.metas.channels %>% 
+live.metas.channels  %>% 
+    mutate(Population = factor(Population,
+                               levels = with(.hc.rows,labels[order])),
+           Channel = factor(Channel,
+                            levels = with(.hc.cols,labels[order])))%>% 
     group_by(Channel) %>% 
     mutate(value = do.L(value)) %>% 
     ggplot(aes(x = Channel,
@@ -87,7 +105,11 @@ live.metas.channels %>%
 ## Median intensity (normalized per population)
 
 ```{r, fig.width = 8}
-live.metas.channels %>% 
+live.metas.channels  %>% 
+    mutate(Population = factor(Population,
+                               levels = with(.hc.rows,labels[order])),
+           Channel = factor(Channel,
+                            levels = with(.hc.cols,labels[order]))) %>% 
     group_by(Population) %>% 
     mutate(value = do.L(value)) %>% 
     ggplot(aes(x = Channel,

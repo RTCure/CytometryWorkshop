@@ -105,7 +105,7 @@ live.metas.channels %>%
 Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
 
 ```{r}
-cur.metas <- NULL
+cur.metas <- c(1,2,7)
 ```
 
 ```{r}
@@ -126,7 +126,8 @@ plot(pheno.rv)+
     geom_density2d(data = . %>% 
                        mutate(Population = live.fsom.metaclusters) %>% 
                        filter(Population %in% cur.metas),
-                   aes(color = Population))
+                   aes(color = Population))+
+    facet_grid(cols = vars(Timepoint))
 ```
 
 ### Functional
@@ -136,7 +137,8 @@ plot(func.rv)+
     geom_density2d(data = . %>% 
                        mutate(Population = live.fsom.metaclusters) %>% 
                        filter(Population %in% cur.metas),
-                   aes(color = Population))
+                   aes(color = Population))+
+    facet_grid(cols = vars(Timepoint))
 ```
 
 ## Fan plots {.tabset}
@@ -190,7 +192,7 @@ live.df %>%
 Metaclusters are composed of clusters, so let's drill down when level deeper
 
 ```{r}
-cur.meta <- NULL
+cur.meta <- 2
 ```
 
 ### Radviz
@@ -214,6 +216,93 @@ plot(pheno.rv)+
 live.df %>% 
     mutate(Population = factor(live.fsom.clusters)) %>% 
     filter(live.fsom.metaclusters==cur.meta) %>% 
+    select(Population,with(markers,name[type %in% c("phenotypic",
+                                                    "functional")])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    mutate(Channel = factor(Channel,
+                            levels = c(rownames(springs(pheno.rv)),
+                                       rownames(springs(func.rv))))) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+# Metaclusters of interest #1
+
+*To visualize or compare different subsets, simply copy the whole section and edit the next block.*
+
+Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
+
+```{r}
+cur.metas <- c(12)
+```
+
+```{r}
+metas.df %>% 
+    filter(Population %in% cur.metas) %>%
+    group_by(Population) %>% 
+    summarize(Count = sum(Count),
+              Total = sum(Total)) %>% 
+    mutate(`Percent cells (Total)` = paste0(round(100*Count/Total,1),"%"))
+```
+
+## Radviz {.tabset}
+
+### Phenotypic
+
+```{r}
+plot(pheno.rv)+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas),
+                   aes(color = Timepoint))
+```
+
+### Functional
+
+```{r}
+plot(func.rv)+
+    geom_density2d(data = . %>% 
+                       mutate(Population = live.fsom.metaclusters) %>% 
+                       filter(Population %in% cur.metas),
+                   aes(color = Timepoint))
+```
+
+## Fan plots {.tabset}
+
+Fan plots ([Britton 1998](https://www.bankofengland.co.uk/quarterly-bulletin/1998/q1/the-inflation-report-projections-understanding-the-fan-chart)) have been implemented for cytometry visualization in the [cytofan](https://cran.r-project.org/package=cytofan) package.
+
+### Phenotypic
+
+```{r}
+live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    filter(Population %in% cur.metas) %>% 
+    select(Population,with(markers,name[type=="phenotypic"])) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    ggplot(aes(x = Channel,
+               y = value))+
+    geom_fan()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    facet_grid(rows = vars(Population))
+```
+
+### All channels
+
+```{r}
+live.df %>% 
+    mutate(Population = factor(live.fsom.metaclusters)) %>% 
+    filter(Population %in% cur.metas) %>% 
     select(Population,with(markers,name[type %in% c("phenotypic",
                                                     "functional")])) %>% 
     rename_with(~ with(markers,

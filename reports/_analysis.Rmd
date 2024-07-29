@@ -98,9 +98,15 @@ ksink <- lapply(cur.pops,function(cur.pop) {
                                      ""),
                `Percent cells` = Count/Total,
                i = dense_rank(`Percent cells`)) %>% 
-        ggplot(aes(x = i,
+        unite("Conditions",
+              PatientType, Timepoint,
+              remove = FALSE) %>% 
+        ggplot(aes(x = Conditions,
                    y = `Percent cells`))+
-        geom_point()+
+        geom_line(aes(group = Individual),
+                  color = "grey80")+
+        geom_point(aes(color = PatientType),
+                   size = 3)+
         scale_y_continuous(labels = scales::percent_format())+
         facet_grid(cols=vars(PopName))
     print(cur.plot)
@@ -151,9 +157,15 @@ ksink <- lapply(cur.pops,function(cur.pop) {
         filter(Population==cur.pop) %>% 
         mutate(`Percent cells` = Count/Total,
                i = dense_rank(`Percent cells`)) %>% 
-        ggplot(aes(x = i,
+        unite("Conditions",
+              PatientType, Timepoint,
+              remove = FALSE) %>% 
+        ggplot(aes(x = Conditions,
                    y = `Percent cells`))+
-        geom_point()+
+        geom_line(aes(group = Individual),
+                  color = "grey80")+
+        geom_point(aes(color = PatientType),
+                   size = 3)+
         scale_y_continuous(labels = scales::percent_format())+
         facet_grid(cols=vars(Population))
     print(cur.plot)

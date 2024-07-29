@@ -36,7 +36,7 @@ source("scripts/900_functions.R")
 
 # Parameters
 
-We need to define:
+We need to define a handful of parameters first:
 
  - the path to the `GatingSet` object to analyze
  - the full node path to the root population of interest
@@ -46,17 +46,30 @@ We need to define:
      - *functional* markers that are indicative of the status of the cells (continuous)
      - all other markers are considered *other*
 
+You can add parameters as you go about, such as `params_problem_markers`, to capture problematic antibodies.
+
+As a rule of thumb, any marker that will help distinguish a population is *phenotypic*.
+
 ```{targets params}
 list(tar_target(params_path,
                 file.path("process","workshop","live")),
      tar_target(params_population,
-                NULL),
+                "/singlets/DNA/live"),
      tar_target(params_ref_markers,
-                NULL),
+                c("CD45","L_D")),
      tar_target(params_pheno_markers,
-                NULL),
+                c('CD3','CD19','CD45RA','CD8a','CD11c','CD16','CD34','CD14',
+                  'TCRgd','CD7','CD33','CD20','CD123','CD56','CD45RO','CD25',
+                  'CD4','CD11b')),
      tar_target(params_func_markers,
-                NULL)
+                c('CD69','CD31','CD86','TIGIT','CD27','CD29','CD366','Foxp3',
+                  'CD38','CD127','CD68','CD62L','CD57','CD44','HLA-DR',
+                  'CD279')),
+     tar_target(params_problem_markers,
+                c('CD163')),
+     tar_target(params_annots_file,
+                "input/HELIOS share/legend.xlsx",
+                format = "file")
 )
 ```
 
@@ -66,7 +79,34 @@ Sample annotation can be either parsed from FCS file names (as below) or loaded 
 
 ```{targets annots, tar_simple=TRUE}
 .gs <- load_gs(params_path)
-tibble(name = sampleNames(.gs))
+.annots <- readxl::read_xlsx(params_annots_file) %>% 
+    dplyr::filter(!is.na(`name file`)) %>% 
+    rename(FCSname = `name file`,
+           Individual = `#patients`,
+           Timepoint = `time of treatment`,
+           BatchId = `acquisition date`,
+           StainingId = `acquisition staining`) %>% 
+    mutate(Individual = factor(Individual),
+           Individual = relevel(Individual,
+                                "Healty Donors"),
+           Individual = fct_recode(Individual,
+                                   "HD" = "Healty Donors"),
+           PatientType = if_else(Individual=="HD",
+                                 "HD","PT"),
+           PatientType = factor(PatientType, 
+                                levels = c("HD","PT")),
+           Timepoint = factor(Timepoint),
+           Timepoint = fct_recode(Timepoint,
+                                  baseline = "n/a",
+                                  treated = "treated (week 36)"),
+           Timepoint = relevel(Timepoint,
+                               "baseline"))
+as_tibble(pData(.gs),
+          rownames = "id") %>% 
+    rename(FCSname = name,
+           name = id) %>% 
+    left_join(.annots,
+              by = "FCSname")
 ```
 
 # Marker annotation
@@ -82,14 +122,17 @@ as_tibble(pData(parameters(gs_cyto_data(.gs)[[1]])),
     mutate(desc = if_else(is.na(desc),
                           name,
                           desc),
+           desc = str_split_fixed(desc,"_",2)[,2],
            type = case_when(
                desc %in% params_ref_markers ~ "reference",
                desc %in% params_pheno_markers ~ "phenotypic",
                desc %in% params_func_markers ~ "functional",
+               desc %in% params_problem_markers ~ "problem",
                TRUE ~ "other"),
            desc = make.names(desc),
            type = factor(type,
-                         levels = c("reference","phenotypic","functional","other")))
+                         levels = c("reference","phenotypic","functional",
+                                    "problem","other")))
 ```
 
 # Extract the data
@@ -142,7 +185,8 @@ tar_read(live.df) %>%
     dplyr::select(all_of(c("name",
                     with(tar_read(markers),
                          name[type %in% c("phenotypic",
-                                          "functional")])))) %>% 
+                                          "functional",
+                                          "problem")])))) %>% 
     rename_with(~ with(tar_read(markers),
                        desc[match(.x,name)]),
                 !name) %>% 
@@ -152,12 +196,13 @@ tar_read(live.df) %>%
     gather(Channel, value,
            all_of(with(tar_read(markers),
                        desc[type %in% c("phenotypic",
-                                        "functional")]))) %>% 
+                                        "functional",
+                                        "problem")]))) %>% 
     ggplot(aes(x = value))+
-    geom_density()+
+    geom_density(aes(color = name))+
     geom_vline(data = . %>% 
                    group_by(Channel) %>% 
-                   reframe(value = quantile(value,c(0,0.975))),
+                   reframe(value = quantile(value,c(0,0.98))),
                aes(xintercept = value),
                col = 2)+
     facet_wrap(~Channel,

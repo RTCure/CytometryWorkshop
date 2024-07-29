@@ -51,10 +51,10 @@ list(
     tar_target(params_fold_lim,1),
     tar_target(params_pval_lim,0.05),
     tar_target(live_model_total,
-               NULL # Count ~ Stimulation + (1|Individual) + offset(logTotal)
+               Count ~ PatientType * Timepoint + (1|Individual) + offset(logTotal)
                ),
     tar_target(params_live_contrasts,{
-        NULL # list("pos to neg" = c(-1,1))
+        list("(Treated-Baseline)PT" = c(0,-1,0,1))
     }),
     # the following target should not be edited
     tar_target(live_model_specs, {
@@ -94,10 +94,15 @@ We keep both the Parent size and the Total size so that analysis can be run rela
 pops.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(live_model_total,
+                       ~ tryCatch(
+                           glmer.nb(live_model_total,
                                   data=.,
-                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
-           estimate = map2(model,
+                                  control = glmerControl(optCtrl = 
+                                                             list(maxfun = 25000))),
+                       error = function(e){})),
+           isError = map_lgl(model,is.null)) %>% 
+    dplyr::filter(!isError) %>% 
+    mutate(estimate = map2(model,
                            data,
                            ~ emmeans(.x,
                                      specs = live_model_specs,
@@ -164,10 +169,15 @@ Only the Total size makes sense here, since metaclusters are not nested. In the 
 metas.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(live_model_total,
+                       ~ tryCatch(
+                           glmer.nb(live_model_total,
                                   data=.,
-                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
-           estimate = map2(model,
+                                  control = glmerControl(optCtrl = 
+                                                             list(maxfun = 25000))),
+                       error = function(e){})),
+           isError = map_lgl(model,is.null)) %>% 
+    dplyr::filter(!isError) %>% 
+    mutate(estimate = map2(model,
                            data,
                            ~ emmeans(.x,
                                      specs = live_model_specs,
