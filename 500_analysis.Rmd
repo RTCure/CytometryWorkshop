@@ -88,14 +88,14 @@ We keep both the Parent size and the Total size so that analysis can be run rela
 pops.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(live_model_total,
-                                  data=.,
-                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
+                       ~ safe.glmer.nb(.model = live_model_total,
+                                       .data = .)),
+           isModel = map_lgl(model,~ class(.)=="glmerMod"),
            estimate = map2(model,
                            data,
-                           ~ emmeans(.x,
-                                     specs = live_model_specs,
-                                     data = .y)),
+                           ~ safe.emmeans(.fit = .x,
+                                          .data = .y,
+                                          .specs = live_model_specs)),
            `N cells` = map_dbl(data,~sum(.$Count)),
            `Percent cells` = 100*`N cells`/sum(`N cells`))
 ```
@@ -104,6 +104,7 @@ Next we extract the contrasts:
 
 ```{targets live.pop.contrasts, tar_simple=TRUE}
 live.pop.models %>% 
+    filter(isModel) %>% 
     mutate(contrast = map(estimate,~ contrast(.,
                                               params_live_contrasts,
                                               adjust = "tukey"))) %>% 
@@ -158,14 +159,14 @@ Only the Total size makes sense here, since metaclusters are not nested. In the 
 metas.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(live_model_total,
-                                  data=.,
-                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
+                       ~ safe.glmer.nb(.model = live_model_total,
+                                       .data = .)),
+           isModel = map_lgl(model,~ class(.)=="glmerMod"),
            estimate = map2(model,
                            data,
-                           ~ emmeans(.x,
-                                     specs = live_model_specs,
-                                     data = .y)),
+                           ~ safe.emmeans(.fit = .x,
+                                          .data = .y,
+                                          .specs = live_model_specs)),
            `N cells` = map_dbl(data,~sum(.$Count)),
            `Percent cells` = 100*`N cells`/sum(`N cells`))
 ```
@@ -174,6 +175,7 @@ Next we extract the contrasts:
 
 ```{targets live.meta.contrasts, tar_simple=TRUE}
 live.meta.models %>% 
+    filter(isModel) %>% 
     mutate(contrast = map(estimate,~ contrast(.,
                                               params_live_contrasts,
                                               adjust = "tukey"))) %>% 

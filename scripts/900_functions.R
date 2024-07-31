@@ -60,3 +60,30 @@ do_shave <- function(v, fun = range, na.rm = T) {
     clean_v[clean_v>max_v] <- max_v
     return(clean_v)
 }
+
+safe.glmer.nb <- function(.model,
+                          .data) {
+    require(lme4)
+    tryCatch(
+        suppressWarnings(
+            glmer.nb(.model,
+                     data = .data,
+                     control = glmerControl(optCtrl = list(maxfun = 25000)))
+        ),
+        error = function(e) { attr(e,"class")}
+    )
+}
+
+safe.emmeans <- function(.fit,
+                         .data,
+                         .specs) {
+    require(emmeans)
+    if(class(.fit)=="glmerMod") {
+        .estimate = emmeans(.fit,
+                            specs = .specs,
+                            data = .data)
+        return(.estimate)
+    } else {
+        return(NA)
+    }
+}

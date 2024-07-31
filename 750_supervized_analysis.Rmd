@@ -185,14 +185,14 @@ tar_target(live.pf.models, {
     live.pf.counts.valid %>% 
         nest(data = -fvCluster) %>% 
         mutate(model = map(data,
-                           ~ glmer.nb(live_pf_model_total,
-                                      data=.,
-                                      control = glmerControl(optCtrl = list(maxfun = 25000)))),
+                           ~ safe.glmer.nb(.model = live_pf_model_total,
+                                           .data = .)),
+               isModel = map_lgl(model,~ class(.)=="glmerMod"),
                estimate = map2(model,
                                data,
-                               ~ emmeans(.x,
-                                         specs = live_pf_model_specs,
-                                         data = .y)),
+                               ~ safe.emmeans(.fit = .x,
+                                              .data = .y,
+                                              .specs = live_pf_model_specs)),
                `N cells` = map_dbl(data,~sum(.$Count)),
                `Percent cells` = 100*`N cells`/sum(`N cells`))
 },
@@ -207,6 +207,7 @@ We can now extract the required contrast(s) from the estimates:
 ```{targets polyfunc-contrasts, tar_interactive = FALSE}
 tar_target(live.pf.contrasts, {
     live.pf.models %>% 
+        filter(isModel) %>% 
         mutate(contrast = map(estimate,~ contrast(.,
                                                   params_live_pf_contrasts,
                                                   adjust = "tukey"))) %>% 
