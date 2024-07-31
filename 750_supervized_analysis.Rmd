@@ -24,13 +24,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -88,18 +82,18 @@ First we will down-sample the projection space to avoid over clustering of dense
 ```{targets polyfunc-downsamples, tar_interactive=FALSE}
 list(
     tar_target(live.pf.cuts, {
-    .cuts <- make.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
-                      n=floor(1.5*params_pf_nbins)+1)
-    .cuts <- do.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
-                    .cuts,
-                    type = "fixed")
+        library(hilbertSimilarity)
+        .cuts <- make.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
+                          n=floor(1.5*params_pf_nbins)+1)
+                        type = "fixed")
   },
   pattern = map(params_fv_metas, live.fvs),
   iteration = "list"),
   tar_target(live.pf.hcs, {
-    .hcs <- do.hilbert(live.pf.cuts,
-                       horder = floor(1.5*params_pf_nbins))
-    factor(.hcs)
+      library(hilbertSimilarity)
+      .hcs <- do.hilbert(live.pf.cuts,
+                         horder = floor(1.5*params_pf_nbins))
+      factor(.hcs)
   },
   pattern = map(params_fv_metas, live.pf.cuts),
   iteration = "list")

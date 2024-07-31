@@ -23,13 +23,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM","Rtsne",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -38,6 +32,7 @@ source("scripts/900_functions.R")
 To visualize single cell data associated with this experiment we use Radviz projections ([Abraham 2016](https://doi.org/10.1002/cyto.b.21499)). First we prepare a scaled dataset for projection:
 
 ```{targets live.scaled, tar_simple=TRUE}
+library(Radviz)
 live.df %>%
     mutate(across(all_of(with(markers,
                               name[type %in% c("phenotypic",
@@ -59,6 +54,7 @@ Next we Compute a similarity matrix and optimize channel orders for phenotypic a
 ```{targets radviz-optim}
 list(
     tar_target(live.sim,{
+        library(Radviz)
         live.scaled %>% 
             select(!name) %>% 
             as.matrix(.) %>% 
@@ -80,6 +76,7 @@ Finally we create the `Radviz` objects corresponding to each type of channels:
 ```{targets radviz-proj}
 list(
     tar_target(pheno.rv,{
+        library(Radviz)
         live.scaled %>% 
             left_join(annots,
                       by = "name") %>% 
@@ -87,6 +84,7 @@ list(
                       pheno.S)
     }),
     tar_target(func.rv,{
+        library(Radviz)
         live.scaled %>% 
             left_join(annots,
                       by = "name") %>% 

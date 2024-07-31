@@ -23,13 +23,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -55,6 +49,7 @@ list(
 Then we run the clustering algorithm:
 
 ```{targets live.fsom, tar_simple=TRUE}
+library(FlowSOM)
 .fs <- live.df %>%
     mutate(across(all_of(params_fsom_channels),
                   ~ do_shave(.x,

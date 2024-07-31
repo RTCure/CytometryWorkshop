@@ -1,4 +1,5 @@
 do_MEM <- function(live.mats, markers) {
+    require(cluster)
     .mats.med <- lapply(live.mats,function(mt,ch) {
         mm <- apply(mt[,ch],2,median)
         return(mm)
@@ -34,6 +35,7 @@ do_MEM <- function(live.mats, markers) {
 }
 
 do_optim_wrap <- function(live.sim, markers) {
+    require(Radviz)
     .S <- make.S(markers)
     .optim <- lapply(seq(1,10),function(i) {
         .optim.cur.cells <- do.optimRadviz(.S,live.sim,top=75)

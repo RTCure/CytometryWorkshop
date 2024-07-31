@@ -24,13 +24,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -70,18 +64,20 @@ list(
 Let's start by extracting population sizes:
 
 ```{targets pops.df, tar_simple=TRUE}
+library(flowWorkspace)
 .gs <- load_gs(params_path)
 recompute(.gs) # just in case
 .counts <- gs_pop_get_count_fast(.gs)
 .total <- .counts %>% 
-    filter(Population==params_population) %>% 
+    dplyr::filter(Population==params_population) %>% 
     dplyr::select(name,Total = Count)
 annots %>%
     left_join(.counts,
               by = "name") %>%
     left_join(.total,
               by = "name") %>%
-    filter(str_detect(Population,fixed(paste0(params_population,"/")))) %>% 
+    dplyr::filter(str_detect(Population,
+                             fixed(paste0(params_population,"/")))) %>% 
     mutate(logTotal = log(Total),
            logParent = log(ParentCount))
 ```

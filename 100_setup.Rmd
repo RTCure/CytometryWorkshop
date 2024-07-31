@@ -24,13 +24,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM","Rtsne",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -71,6 +65,7 @@ list(tar_target(params_path,
 Sample annotation can be either parsed from FCS file names (as below) or loaded from a file; is **must** include at least a `name` column corresponding to the FCS file names as returned by `sampleNames(.gs)` below.
 
 ```{targets annots, tar_simple=TRUE}
+library(flowWorkspace)
 .gs <- load_gs(params_path)
 tibble(name = sampleNames(.gs)) %>% 
     mutate(Experiment = str_extract(name,"[0-9]{8}"),
@@ -96,6 +91,8 @@ Marker annotation uses the parameters identified above to identify channels that
 It's easier to get started from the file associated with the `GatingSet` being analyzed as shown below:
 
 ```{targets markers, tar_simple=TRUE}
+library(flowCore)
+library(flowWorkspace)
 .gs <- load_gs(params_path)
 as_tibble(pData(parameters(gs_cyto_data(.gs)[[1]])),
           rownames = "id") %>% 
@@ -119,6 +116,7 @@ To run the analysis we will need to access the expression values stored in the F
 ```{targets gs-to-tibble}
 list(
     tar_target(live.mats,{
+        library(flowWorkspace)
         .gs <- load_gs(params_path)
         .fs <- gs_pop_get_data(.gs,
                                params_population)
