@@ -81,6 +81,70 @@ list(
 )
 ```
 
+# Heatmaps
+
+We will generate `ggplot2` heatmaps of channel intensity for clusters and metaclusters, to be used in different reports.
+
+## Clusters
+
+```{targets live.clusters.channels, tar_simple=TRUE}
+.df <- live.df %>% 
+    mutate(Population = live.fsom.clusters) %>% 
+    select(all_of(c("Population",params_fsom_channels))) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    group_by(Population,Channel) %>% 
+    summarize(value = median(value),
+              .groups = "drop_last")
+
+.mat <- .df %>% 
+    spread(Channel,value)
+.ids <- .mat[,1,drop=TRUE]
+.mat <- as.matrix(.mat[,-1])
+rownames(.mat) <- .ids
+.hc.rows <- hclust(dist(.mat))
+.hc.cols <- hclust(dist(t(.mat)))
+
+.df %>% 
+    mutate(Population = factor(Population,
+                               levels = with(.hc.rows,labels[order])),
+           Channel = factor(Channel,
+                            levels = with(.hc.cols,labels[order])))
+```
+
+## Metaclusters
+
+```{targets live.metas.channels, tar_simple=TRUE}
+.df <- live.df %>% 
+    mutate(Population = live.fsom.metaclusters) %>% 
+    select(all_of(c("Population",params_fsom_channels))) %>% 
+    rename_with(~ with(markers,
+                       desc[match(.x,name)]),
+                !Population) %>% 
+    gather("Channel","value",
+           -Population) %>% 
+    group_by(Population,Channel) %>% 
+    summarize(value = median(value),
+              .groups = "drop_last")
+
+.mat <- .df %>% 
+    spread(Channel,value)
+.ids <- .mat[,1,drop=TRUE]
+.mat <- as.matrix(.mat[,-1])
+rownames(.mat) <- .ids
+.hc.rows <- hclust(dist(.mat))
+.hc.cols <- hclust(dist(t(.mat)))
+
+.df %>% 
+    mutate(Population = factor(Population,
+                               levels = with(.hc.rows,labels[order])),
+           Channel = factor(Channel,
+                            levels = with(.hc.cols,labels[order])))
+```
+
 # Render the `_clustering` report
 
 We will reviewing the output of clustering in the `_clustering` report:

@@ -36,37 +36,23 @@ tar_load(live.df)
 tar_load(params_fsom_channels)
 tar_load(live.fsom.clusters)
 tar_load(live.fsom.metaclusters)
+tar_load(live.metas.channels)
 ```
 
 # Metacluster profiles {.tabset}
-
-We start by computing the median channel intensity per metacluster:
-
-```{r}
-live.metas.channels <- live.df %>% 
-    mutate(Population = live.fsom.metaclusters) %>% 
-    select(all_of(c("Population",params_fsom_channels))) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
-    group_by(Population,Channel) %>% 
-    summarize(value = median(value),
-              .groups = "drop_last")
-```
 
 Let's visualize metaclusters as heatmaps:
 
 ## Median intensity
 
 ```{r, fig.width = 8}
- live.metas.channels %>% 
+live.metas.channels %>% 
     ggplot(aes(x = Channel,
                y = Population))+
     geom_tile(aes(fill = value))+
     scale_fill_gradient2(low = "grey80",
-                          high = "orangered2")
+                          high = "orangered2")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Median intensity (normalized per channel)
@@ -79,7 +65,8 @@ live.metas.channels %>%
                y = Population))+
     geom_tile(aes(fill = value))+
     scale_fill_gradient2(low = "grey80",
-                          high = "orangered2")
+                          high = "orangered2")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Median intensity (normalized per population)
@@ -92,6 +79,7 @@ live.metas.channels %>%
                y = Population))+
     geom_tile(aes(fill = value))+
     scale_fill_gradient2(low = "grey80",
-                          high = "orangered2")
+                          high = "orangered2")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
