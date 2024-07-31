@@ -15,6 +15,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ```{r libraries}
 library(targets)
+library(tidyverse)
 # tar_unscript() # this line resets the whole pipeline!
 ```
 
@@ -137,6 +138,40 @@ list(
 )
 ```
 
+Next we generate an overview of the distribution of channel intensity across the data, to be used for reporting:
+
+```{targets channel-overview}
+tar_target(live.channels.overview,{
+    live.df %>%
+        dplyr::select(all_of(c("name",
+                               with(markers,
+                                    name[type %in% c("phenotypic",
+                                                     "functional")])))) %>% 
+        rename_with(~ with(markers,
+                           desc[match(.x,name)]),
+                    !name) %>% 
+        left_join(annots,
+                  by = "name") %>% 
+        sample_frac(0.1) %>% 
+        gather(Channel, value,
+               all_of(with(markers,
+                           desc[type %in% c("phenotypic",
+                                            "functional")]))) %>% 
+        ggplot(aes(x = value))+
+        geom_density()+
+        geom_vline(data = . %>% 
+                       group_by(Channel) %>% 
+                       reframe(value = quantile(value,
+                                                params_markers_lims)),
+                   aes(xintercept = value),
+                   col = 2)+
+        facet_wrap(~Channel,
+                   scales = "free_y")+
+        theme_light(base_size = 12)
+})
+```
+
+
 # Run the pipeline
 
 ```{r run}
@@ -160,30 +195,5 @@ tar_read(markers)
 ## Channel Overview
 
 ```{r view-channels,fig.width=12,fig.height=9}
-library(tidyverse)
-tar_read(live.df) %>%
-    dplyr::select(all_of(c("name",
-                           with(tar_read(markers),
-                                name[type %in% c("phenotypic",
-                                                 "functional")])))) %>% 
-    rename_with(~ with(tar_read(markers),
-                       desc[match(.x,name)]),
-                !name) %>% 
-    left_join(tar_read(annots),
-              by = "name") %>% 
-    sample_frac(0.1) %>% 
-    gather(Channel, value,
-           all_of(with(tar_read(markers),
-                       desc[type %in% c("phenotypic",
-                                        "functional")]))) %>% 
-    ggplot(aes(x = value))+
-    geom_density()+
-    geom_vline(data = . %>% 
-                   group_by(Channel) %>% 
-                   reframe(value = quantile(value,
-                                            tar_read(params_markers_lims))),
-               aes(xintercept = value),
-               col = 2)+
-    facet_wrap(~Channel,
-               scales = "free_y")
+tar_read(live.channels.overview)
 ```
