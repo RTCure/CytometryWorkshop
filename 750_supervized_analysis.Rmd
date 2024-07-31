@@ -85,6 +85,8 @@ list(
         library(hilbertSimilarity)
         .cuts <- make.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
                           n=floor(1.5*params_pf_nbins)+1)
+        .cuts <- do.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
+                        .cuts,
                         type = "fixed")
   },
   pattern = map(params_fv_metas, live.fvs),
@@ -163,7 +165,7 @@ To make sure the models can be fitted we will focus on clusters where all model 
 
 ```{targets polyfunc-counts-valid, tar_interactive = FALSE}
 tar_target(live.pf.counts.valid, {
-    live.pf.countslive.pf.counts %>% 
+    live.pf.counts %>% 
         unite("coefs",
               one_of(labels(terms(live_pf_model_specs))),
               remove = FALSE) %>%

@@ -54,7 +54,7 @@ library(FlowSOM)
     mutate(across(all_of(params_fsom_channels),
                   ~ do_shave(.x,
                              fun=function(x) quantile(x,
-                                                      c(0.005,0.995))))) %>% 
+                                                      params_markers_lims)))) %>% 
     dplyr::select(all_of(params_fsom_channels)) %>% 
     as.matrix(.)
 
