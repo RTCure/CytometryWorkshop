@@ -45,6 +45,9 @@ We need to define:
      - *phenotypic* markers that are differentiating populations within the population of interest (bimodal)
      - *functional* markers that are indicative of the status of the cells (continuous)
      - all other markers are considered *other*
+ - the quantiles to use to shave off extreme single cell values from channels
+     - used for visualization of channel distribution
+     - used for Radviz projections
 
 ```{targets params}
 list(tar_target(params_path,
@@ -57,7 +60,9 @@ list(tar_target(params_path,
                 c('gd','CD25','CD45RA','FOXP3','CD8','CD4')),
      tar_target(params_func_markers,
                 c('IL1B','TNF','IFNG','CCR6','CCR7','PRF1','IL6','IL10','CD137',
-                  'CD69','HLADR','IL17A','GMCSF'))
+                  'CD69','HLADR','IL17A','GMCSF')),
+     tar_target(params_markers_lims,
+                c(0.005,0.995))
 )
 ```
 
@@ -177,7 +182,8 @@ tar_read(live.df) %>%
     geom_density()+
     geom_vline(data = . %>% 
                    group_by(Channel) %>% 
-                   reframe(value = quantile(value,c(0.005,0.995))),
+                   reframe(value = quantile(value,
+                                            tar_read(params_markers_lims))),
                aes(xintercept = value),
                col = 2)+
     facet_wrap(~Channel,
