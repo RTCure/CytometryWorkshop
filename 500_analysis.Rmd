@@ -24,13 +24,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -48,15 +42,13 @@ The pipeline will automatically correct for multiple testing at the contrast lev
 
 ```{targets params-analysis}
 list(
-    tar_target(params_fold_lim,1),
-    tar_target(params_pval_lim,0.05),
+    tar_target(params_fold_lim,0.8),
+    tar_target(params_pval_lim,0.01),
     tar_target(live_model_total,
-               NULL # Count ~ Stimulation + (1|Individual) + offset(logTotal)
-               ),
+               Count ~ Condition + (1|Individual) + offset(logTotal)),
     tar_target(params_live_contrasts,{
-        NULL # list("pos to neg" = c(-1,1))
+        list("PMA_Iono to Unstim" = c(-1,1))
     }),
-    # the following target should not be edited
     tar_target(live_model_specs, {
         .specs <- labels(terms(live_model_total))
         .specs <- .specs[-c(grep("\\|", .specs), grep("\\:", .specs))]
@@ -72,18 +64,20 @@ list(
 Let's start by extracting population sizes:
 
 ```{targets pops.df, tar_simple=TRUE}
+library(flowWorkspace)
 .gs <- load_gs(params_path)
 recompute(.gs) # just in case
 .counts <- gs_pop_get_count_fast(.gs)
 .total <- .counts %>% 
-    filter(Population==params_population) %>% 
+    dplyr::filter(Population==params_population) %>% 
     dplyr::select(name,Total = Count)
 annots %>%
     left_join(.counts,
               by = "name") %>%
     left_join(.total,
               by = "name") %>%
-    filter(str_detect(Population,fixed(paste0(params_population,"/")))) %>% 
+    dplyr::filter(str_detect(Population,
+                             fixed(paste0(params_population,"/")))) %>% 
     mutate(logTotal = log(Total),
            logParent = log(ParentCount))
 ```
@@ -94,14 +88,14 @@ We keep both the Parent size and the Total size so that analysis can be run rela
 pops.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(live_model_total,
-                                  data=.,
-                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
+                       ~ safe.glmer.nb(.model = live_model_total,
+                                       .data = .)),
+           isModel = map_lgl(model,~ class(.)=="glmerMod"),
            estimate = map2(model,
                            data,
-                           ~ emmeans(.x,
-                                     specs = live_model_specs,
-                                     data = .y)),
+                           ~ safe.emmeans(.fit = .x,
+                                          .data = .y,
+                                          .specs = live_model_specs)),
            `N cells` = map_dbl(data,~sum(.$Count)),
            `Percent cells` = 100*`N cells`/sum(`N cells`))
 ```
@@ -110,6 +104,7 @@ Next we extract the contrasts:
 
 ```{targets live.pop.contrasts, tar_simple=TRUE}
 live.pop.models %>% 
+    filter(isModel) %>% 
     mutate(contrast = map(estimate,~ contrast(.,
                                               params_live_contrasts,
                                               adjust = "tukey"))) %>% 
@@ -164,14 +159,14 @@ Only the Total size makes sense here, since metaclusters are not nested. In the 
 metas.df %>% 
     nest(data = -Population) %>% 
     mutate(model = map(data,
-                       ~ glmer.nb(live_model_total,
-                                  data=.,
-                                  control = glmerControl(optCtrl = list(maxfun = 25000)))),
+                       ~ safe.glmer.nb(.model = live_model_total,
+                                       .data = .)),
+           isModel = map_lgl(model,~ class(.)=="glmerMod"),
            estimate = map2(model,
                            data,
-                           ~ emmeans(.x,
-                                     specs = live_model_specs,
-                                     data = .y)),
+                           ~ safe.emmeans(.fit = .x,
+                                          .data = .y,
+                                          .specs = live_model_specs)),
            `N cells` = map_dbl(data,~sum(.$Count)),
            `Percent cells` = 100*`N cells`/sum(`N cells`))
 ```
@@ -180,6 +175,7 @@ Next we extract the contrasts:
 
 ```{targets live.meta.contrasts, tar_simple=TRUE}
 live.meta.models %>% 
+    filter(isModel) %>% 
     mutate(contrast = map(estimate,~ contrast(.,
                                               params_live_contrasts,
                                               adjust = "tukey"))) %>% 

@@ -15,6 +15,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ```{r libraries}
 library(targets)
+library(tidyverse)
 # tar_unscript() # this line resets the whole pipeline!
 ```
 
@@ -24,13 +25,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM","Rtsne",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -45,18 +40,24 @@ We need to define:
      - *phenotypic* markers that are differentiating populations within the population of interest (bimodal)
      - *functional* markers that are indicative of the status of the cells (continuous)
      - all other markers are considered *other*
+ - the quantiles to use to shave off extreme single cell values from channels
+     - used for visualization of channel distribution
+     - used for Radviz projections
 
 ```{targets params}
 list(tar_target(params_path,
                 file.path("process","workshop","live")),
      tar_target(params_population,
-                NULL),
+                "/Lymphocytes+Monocytes/Single Cells/live/CD3 subset, FSC-A"),
      tar_target(params_ref_markers,
-                NULL),
+                c('CD3','CD14','LIVE')),
      tar_target(params_pheno_markers,
-                NULL),
+                c('gd','CD25','CD45RA','FOXP3','CD8','CD4')),
      tar_target(params_func_markers,
-                NULL)
+                c('IL1B','TNF','IFNG','CCR6','CCR7','PRF1','IL6','IL10','CD137',
+                  'CD69','HLADR','IL17A','GMCSF')),
+     tar_target(params_markers_lims,
+                c(0.005,0.995))
 )
 ```
 
@@ -65,8 +66,23 @@ list(tar_target(params_path,
 Sample annotation can be either parsed from FCS file names (as below) or loaded from a file; is **must** include at least a `name` column corresponding to the FCS file names as returned by `sampleNames(.gs)` below.
 
 ```{targets annots, tar_simple=TRUE}
+library(flowWorkspace)
 .gs <- load_gs(params_path)
-tibble(name = sampleNames(.gs))
+tibble(name = sampleNames(.gs)) %>% 
+    mutate(Experiment = str_extract(name,"[0-9]{8}"),
+           Individual = str_extract(name,"(Amy|HC)[0-9]{1,}"),
+           Condition = str_extract(name,"(unstim|Iono)_Unmixed"),
+           Condition = factor(Condition,
+                              levels = c("unstim_Unmixed",
+                                         "Iono_Unmixed"),
+                              labels = c("Unstimulated",
+                                         "PMA_Iono")),
+           PatientType = if_else(str_detect(Individual,"HC"),
+                                 "Healthy control",
+                                 "Patient"),
+           PatientType = factor(PatientType,
+                                levels = c("Healthy control",
+                                           "Patient")))
 ```
 
 # Marker annotation
@@ -76,6 +92,8 @@ Marker annotation uses the parameters identified above to identify channels that
 It's easier to get started from the file associated with the `GatingSet` being analyzed as shown below:
 
 ```{targets markers, tar_simple=TRUE}
+library(flowCore)
+library(flowWorkspace)
 .gs <- load_gs(params_path)
 as_tibble(pData(parameters(gs_cyto_data(.gs)[[1]])),
           rownames = "id") %>% 
@@ -99,6 +117,7 @@ To run the analysis we will need to access the expression values stored in the F
 ```{targets gs-to-tibble}
 list(
     tar_target(live.mats,{
+        library(flowWorkspace)
         .gs <- load_gs(params_path)
         .fs <- gs_pop_get_data(.gs,
                                params_population)
@@ -109,10 +128,49 @@ list(
     tar_target(live.df,{
         bind_rows(lapply(live.mats,
                          as_tibble),
-                  .id = "name")
+                  .id = "name") %>%
+            mutate(across(all_of(with(markers,
+                                      name[type %in% c("phenotypic",
+                                                       "functional")])),
+                          ~ do_shave(.x,
+                                     fun=function(x) c(0,max(x)))))
     })
 )
 ```
+
+Next we generate an overview of the distribution of channel intensity across the data, to be used for reporting:
+
+```{targets channel-overview}
+tar_target(live.channels.overview,{
+    live.df %>%
+        dplyr::select(all_of(c("name",
+                               with(markers,
+                                    name[type %in% c("phenotypic",
+                                                     "functional")])))) %>% 
+        rename_with(~ with(markers,
+                           desc[match(.x,name)]),
+                    !name) %>% 
+        left_join(annots,
+                  by = "name") %>% 
+        sample_frac(0.1) %>% 
+        gather(Channel, value,
+               all_of(with(markers,
+                           desc[type %in% c("phenotypic",
+                                            "functional")]))) %>% 
+        ggplot(aes(x = value))+
+        geom_density()+
+        geom_vline(data = . %>% 
+                       group_by(Channel) %>% 
+                       reframe(value = quantile(value,
+                                                params_markers_lims)),
+                   aes(xintercept = value),
+                   col = 2)+
+        facet_wrap(~Channel,
+                   scales = "free_y")+
+        theme_light(base_size = 12)
+})
+```
+
 
 # Run the pipeline
 
@@ -137,29 +195,5 @@ tar_read(markers)
 ## Channel Overview
 
 ```{r view-channels,fig.width=12,fig.height=9}
-library(tidyverse)
-tar_read(live.df) %>%
-    dplyr::select(all_of(c("name",
-                    with(tar_read(markers),
-                         name[type %in% c("phenotypic",
-                                          "functional")])))) %>% 
-    rename_with(~ with(tar_read(markers),
-                       desc[match(.x,name)]),
-                !name) %>% 
-    left_join(tar_read(annots),
-              by = "name") %>% 
-    sample_frac(0.1) %>% 
-    gather(Channel, value,
-           all_of(with(tar_read(markers),
-                       desc[type %in% c("phenotypic",
-                                        "functional")]))) %>% 
-    ggplot(aes(x = value))+
-    geom_density()+
-    geom_vline(data = . %>% 
-                   group_by(Channel) %>% 
-                   reframe(value = quantile(value,c(0,0.975))),
-               aes(xintercept = value),
-               col = 2)+
-    facet_wrap(~Channel,
-               scales = "free_y")
+tar_read(live.channels.overview)
 ```

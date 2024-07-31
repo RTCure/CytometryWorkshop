@@ -24,13 +24,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -79,18 +73,20 @@ First we will down-sample the projection space to avoid over clustering of dense
 ```{targets polyfunc-downsamples, tar_interactive=FALSE}
 list(
     tar_target(live.pf.cuts, {
-    .cuts <- make.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
-                      n=floor(1.5*params_pf_nbins)+1)
-    .cuts <- do.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
-                    .cuts,
-                    type = "fixed")
+        library(hilbertSimilarity)
+        .cuts <- make.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
+                          n=floor(1.5*params_pf_nbins)+1)
+        .cuts <- do.cut(as.matrix(live.fvs$proj$data[,c("rx","ry")]),
+                        .cuts,
+                        type = "fixed")
   },
   pattern = map(params_fv_metas, live.fvs),
   iteration = "list"),
   tar_target(live.pf.hcs, {
-    .hcs <- do.hilbert(live.pf.cuts,
-                       horder = floor(1.5*params_pf_nbins))
-    factor(.hcs)
+      library(hilbertSimilarity)
+      .hcs <- do.hilbert(live.pf.cuts,
+                         horder = floor(1.5*params_pf_nbins))
+      factor(.hcs)
   },
   pattern = map(params_fv_metas, live.pf.cuts),
   iteration = "list")
@@ -160,7 +156,7 @@ To make sure the models can be fitted we will focus on clusters where all model 
 
 ```{targets polyfunc-counts-valid, tar_interactive = FALSE}
 tar_target(live.pf.counts.valid, {
-    live.pf.countslive.pf.counts %>% 
+    live.pf.counts %>% 
         unite("coefs",
               one_of(labels(terms(live_pf_model_specs))),
               remove = FALSE) %>%
@@ -182,14 +178,14 @@ tar_target(live.pf.models, {
     live.pf.counts.valid %>% 
         nest(data = -fvCluster) %>% 
         mutate(model = map(data,
-                           ~ glmer.nb(live_pf_model_total,
-                                      data=.,
-                                      control = glmerControl(optCtrl = list(maxfun = 25000)))),
+                           ~ safe.glmer.nb(.model = live_pf_model_total,
+                                           .data = .)),
+               isModel = map_lgl(model,~ class(.)=="glmerMod"),
                estimate = map2(model,
                                data,
-                               ~ emmeans(.x,
-                                         specs = live_pf_model_specs,
-                                         data = .y)),
+                               ~ safe.emmeans(.fit = .x,
+                                              .data = .y,
+                                              .specs = live_pf_model_specs)),
                `N cells` = map_dbl(data,~sum(.$Count)),
                `Percent cells` = 100*`N cells`/sum(`N cells`))
 },
@@ -204,6 +200,7 @@ We can now extract the required contrast(s) from the estimates:
 ```{targets polyfunc-contrasts, tar_interactive = FALSE}
 tar_target(live.pf.contrasts, {
     live.pf.models %>% 
+        filter(isModel) %>% 
         mutate(contrast = map(estimate,~ contrast(.,
                                                   params_live_pf_contrasts,
                                                   adjust = "tukey"))) %>% 

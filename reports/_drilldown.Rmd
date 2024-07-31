@@ -43,22 +43,6 @@ tar_load(metas.df)
 
 # Metacluster profiles {.tabset}
 
-We start by computing the median channel intensity per metacluster:
-
-```{r}
-live.metas.channels <- live.df %>% 
-    mutate(Population = live.fsom.metaclusters) %>% 
-    select(all_of(c("Population",params_fsom_channels))) %>% 
-    rename_with(~ with(markers,
-                       desc[match(.x,name)]),
-                !Population) %>% 
-    gather("Channel","value",
-           -Population) %>% 
-    group_by(Population,Channel) %>% 
-    summarize(value = median(value),
-              .groups = "drop_last")
-```
-
 Let's visualize metaclusters as heatmaps:
 
 ## Median intensity
@@ -69,7 +53,8 @@ live.metas.channels %>%
                y = Population))+
     geom_tile(aes(fill = value))+
     scale_fill_gradient2(low = "grey80",
-                          high = "orangered2")
+                          high = "orangered2")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Median intensity (normalized per channel)
@@ -82,7 +67,8 @@ live.metas.channels %>%
                y = Population))+
     geom_tile(aes(fill = value))+
     scale_fill_gradient2(low = "grey80",
-                          high = "orangered2")
+                          high = "orangered2")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Median intensity (normalized per population)
@@ -95,7 +81,8 @@ live.metas.channels %>%
                y = Population))+
     geom_tile(aes(fill = value))+
     scale_fill_gradient2(low = "grey80",
-                          high = "orangered2")
+                          high = "orangered2")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 # Metaclusters of interest #1
@@ -105,7 +92,7 @@ live.metas.channels %>%
 Based on this visualization, or on the results of the differential analysis, let's select a handful of metaclusters to  drill down into: 
 
 ```{r}
-cur.metas <- NULL
+cur.metas <- c(1,5,6)
 ```
 
 ```{r}
@@ -190,7 +177,7 @@ live.df %>%
 Metaclusters are composed of clusters, so let's drill down when level deeper
 
 ```{r}
-cur.meta <- NULL
+cur.meta <- 5
 ```
 
 ### Radviz

@@ -23,13 +23,7 @@ We first define some global options/functions common to all targets.
 
 ```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c(c("MASS","cluster",
-                              "flowWorkspace","flowCore",
-                              "hilbertSimilarity","entropy",
-                              "Radviz","cytofan",
-                              "lme4","emmeans",
-                              "FlowSOM","Rtsne",
-                              "yaml","tidyverse")))
+tar_option_set(packages = c("tidyverse"))
 source("scripts/900_functions.R")
 ```
 
@@ -81,6 +75,7 @@ list(
 Next we associate every cell in the dataset to a value on the Hilbert curve defined over all selected channels, first by defining cuts:
 
 ```{targets live.hilbert.cuts, tar_simple=TRUE, tar_interactive=FALSE}
+library(hilbertSimilarity)
 ## create the cuts 
 .cuts <- live.df %>% 
     select(all_of(params_hilbert_channels)) %>% 
@@ -93,6 +88,7 @@ Next we associate every cell in the dataset to a value on the Hilbert curve defi
 then by applying those cuts:
 
 ```{targets live.hilbert, tar_simple=TRUE, tar_interactive=FALSE}
+library(hilbertSimilarity)
 ## apply the cuts
 .cutMat <- live.df %>% 
     select(all_of(params_hilbert_channels)) %>% 
@@ -109,6 +105,7 @@ do.hilbert(.cutMat,
 Based on the Hilbert index we compute the composition of every sample and determine sample similarity using the Jensen-Shannon distance:
 
 ```{targets live.hilbert.dist, tar_simple=TRUE, tar_interactive = FALSE}
+library(hilbertSimilarity)
 .counts <- table(live.df$name,
                  live.hilbert)
 
@@ -118,6 +115,7 @@ js.dist(.counts)
 To visualize the similarity between samples we create a simple projection using the **M**ulti**D**imensional **S**caling method:
 
 ```{targets live.hilbert.proj, tar_simple=TRUE, tar_interactive = FALSE}
+library(MASS)
 .proj <- isoMDS(live.hilbert.dist)
 
 as_tibble(.proj$points,
